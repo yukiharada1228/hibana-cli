@@ -86,7 +86,12 @@ export async function publishInstallation(staging, root, key) {
     await rename(staging, root);
     return;
   } catch (error) {
-    if (!["EEXIST", "ENOTEMPTY"].includes(error.code)) throw error;
+    // Windows reports EPERM when a competing process already published the
+    // destination directory. Treat it as a collision only when that directory
+    // actually exists; permission failures elsewhere must still propagate.
+    const existingDirectory = process.platform === "win32" && error.code === "EPERM"
+      && await lstat(root).then(info => info.isDirectory(), () => false);
+    if (!["EEXIST", "ENOTEMPTY"].includes(error.code) && !existingDirectory) throw error;
   }
   if (await isCompleteInstallation(root, key)) return;
 
