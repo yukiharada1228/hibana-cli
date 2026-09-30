@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {execFile,fork} from 'node:child_process';
+import {fork} from 'node:child_process';
+import {run} from '../dist/process.js';
 import {createHash} from 'node:crypto';
 import {once} from 'node:events';
 import {createServer} from 'node:https';
 import {setTimeout as delay} from 'node:timers/promises';
-import {promisify} from 'node:util';
 import {mkdtemp,mkdir,writeFile,readFile,rm,readdir,symlink} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join,dirname} from 'node:path';
@@ -17,7 +17,7 @@ import {shouldRebuild} from '../dist/dev.js';
 import {parseCommand} from '../dist/commands.js';
 import {installExtensionPackages} from '../dist/extension-packages.js';
 
-const exec=promisify(execFile);
+const exec=(command,args,options={})=>run(command,args,{...options,capture:true});
 const json=value=>JSON.stringify(value,null,2)+'\n';
 async function fixture(t, manifestFields = {}) {
   const root=await mkdtemp(join(tmpdir(),'hibana-managed-extensions-'));
