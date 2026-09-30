@@ -9,6 +9,19 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { dirname, join, isAbsolute } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
+
+async function replaceFile(source: string, destination: string) {
+  // Windows can temporarily deny rename while another process reads the old
+  // cache file. Retry the atomic operation; never unlink a working destination.
+  for (let attempt = 0; ; attempt++) {
+    try { await rename(source, destination); return; }
+    catch (error) {
+      if (process.platform !== "win32" || !["EPERM", "EACCES", "EBUSY"].includes(error.code) || attempt >= 40) throw error;
+      await delay(50);
+    }
+  }
+}
 
 async function inventory(root, directory = "", files: [string, number][] = []) {
   for (const entry of await readdir(join(root, directory), {
@@ -113,7 +126,7 @@ export async function publishInstallation(staging, root, key) {
   for (const [path] of files) {
     const target = join(root, path);
     await ensureDirectory(dirname(target));
-    await rename(join(staging, path), target);
+    await replaceFile(join(staging, path), target);
   }
-  await rename(join(staging, "ready"), join(root, "ready"));
+  await replaceFile(join(staging, "ready"), join(root, "ready"));
 }
