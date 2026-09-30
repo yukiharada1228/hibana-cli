@@ -2,3 +2,6 @@
 *.wasm binary
 *.gz binary
 *.tgz binary
+
+# Third-party license documents are retained for redistribution, not CLI code.
+licenses/** linguist-vendored

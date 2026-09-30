@@ -28,6 +28,26 @@ Use connection profiles for remote deployments. Credentials stay in local profil
 application secrets are managed with `hibana secret`. Infrastructure administration commands
 (`hibana platform ...`) belong to the private operator tools, and are not in this package.
 
+## Repository layout and languages
+
+The command implementation is TypeScript. Bundled compiler dependencies and
+maintenance tools have different implementation languages:
+
+| Location | Language/content | Purpose |
+| --- | --- | --- |
+| `src/` | TypeScript | All public commands, HTTP client, authentication, build and dev orchestration |
+| `test/`, `scripts/` | JavaScript | Existing regression tests and package verification; these are not shipped as command implementations |
+| `tools/compose/src/main.rs` | Rust, 21 lines | Calls upstream `wac-graph` to connect Wasm components; compiled to portable `assets/compose.wasm` |
+| `tools/engine/async-context.*` | C++ | Async-context hooks in the bundled SpiderMonkey-based engine |
+| `tools/engine/build-reference.rs` | Rust reference | Archived publisher recipe documenting how the engine asset was built |
+| `licenses/` | HTML/text and upstream notices | Third-party license documents; excluded from GitHub language statistics as vendored material |
+| `assets/`, `wit/` | Wasm/archives and WIT | Compiler assets and the public Component interface contract |
+
+Users run Node.js and the bundled Wasm assets. Neither Rust nor C++ compilation
+is part of installation or normal CLI execution. TypeScript governs the CLI's
+commands; it does not replace the implementation languages of the underlying
+JavaScript engine or WebAssembly composition library.
+
 ## Platforms
 
 | Capability | Linux | macOS | Windows |
