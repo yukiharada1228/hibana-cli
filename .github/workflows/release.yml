@@ -36,9 +36,7 @@ jobs:
         shell: bash
         run: |
           version=$(node -p 'require("./package.json").version')
-          channel=latest
-          if [[ "$version" == *-* ]]; then channel=next; fi
-          npm publish "yukiharada1228-hibana-$version.tgz" --access public --provenance --tag "$channel"
+          npm publish "yukiharada1228-hibana-$version.tgz" --access public --provenance --tag latest
       - name: Publish reviewed package on GitHub
         env:
           GH_TOKEN: ${{ github.token }}

@@ -9,7 +9,7 @@ The Hibana service and infrastructure are maintained separately in a private rep
 Requires Node.js 24 or newer and npm.
 
 ```sh
-npm install -g @yukiharada1228/hibana@next
+npm install -g @yukiharada1228/hibana@latest
 hibana init my-api
 cd my-api
 npm run dev
@@ -53,7 +53,7 @@ WIT interfaces, templates, and notices.
 Update existing applications with:
 
 ```sh
-npm install --save-dev @yukiharada1228/hibana@next
+npm install --save-dev @yukiharada1228/hibana@latest
 ```
 
 The previous Rust CLI's automatic runtime download points at the old repository. After that
@@ -86,7 +86,8 @@ and notices. They do not contain service credentials or infrastructure configura
 
 CI must pass on Linux, macOS and Windows. Bump package and lockfile versions together and
 push `v<package version>`. `.github/workflows/release.yml` publishes the tested tarball using
-npm trusted publishing (GitHub OIDC), then creates the CLI GitHub Release. Prereleases use
-npm's `next` dist-tag; stable releases use `latest`. Runtime tags never publish npm packages.
+npm trusted publishing (GitHub OIDC), then creates the CLI GitHub Release. The existing `latest` channel
+continues to receive the current CLI candidate, so ordinary npx users migrate too. Runtime
+tags never publish npm packages.
 Configure the npm trusted publisher for owner `yukiharada1228`, repository `hibana-cli`,
 workflow `release.yml` (no environment). No npm publishing token is stored in GitHub.
