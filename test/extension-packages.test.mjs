@@ -322,8 +322,8 @@ test('partial caches restore atomically from the unchanged lock, including concu
     ()=>writeFile(source,''),
     ()=>rm(join(cache,'ready')),
     ()=>writeFile(join(cache,'ready'),'invalid marker'),
-    ()=>writeFile(join(cache,'ready'),cache.split('/').at(-1)),
-    ()=>writeFile(join(cache,'ready'),json({key:cache.split('/').at(-1),files:[['\0',1]]})),
+    ()=>writeFile(join(cache,'ready'),basename(cache)),
+    ()=>writeFile(join(cache,'ready'),json({key:basename(cache),files:[['\0',1]]})),
   ];
   for(const corrupt of damage){
     await corrupt();
@@ -331,6 +331,6 @@ test('partial caches restore atomically from the unchanged lock, including concu
     for(const plan of restored)assert.deepEqual(plan,original);
     assert.deepEqual(await readFile(source),content);
     assert.equal(await readFile(join(f.root,'hibana-lock.json'),'utf8'),lock);
-    assert.deepEqual(await readdir(join(f.root,'.hibana/extensions')),[cache.split('/').at(-1)]);
+    assert.deepEqual(await readdir(join(f.root,'.hibana/extensions')),[basename(cache)]);
   }
 });
