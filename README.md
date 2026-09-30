@@ -1,8 +1,9 @@
 # Hibana CLI
 
-The public TypeScript CLI for building and deploying Hibana WebAssembly applications.
-The executable remains `hibana`; the npm package remains `@yukiharada1228/hibana`.
-The Hibana service and infrastructure are maintained separately in a private repository.
+Build, run, and deploy WebAssembly apps with Hibana.
+
+Start with a TypeScript/Hono app, develop locally with automatic reloads, and deploy
+to a Hibana server from your terminal.
 
 ## Quick start
 
@@ -15,63 +16,38 @@ cd my-api
 npm run dev
 ```
 
-Hono applications compile to a WASI HTTP Component. `hibana dev` installs a checksum-verified
-local Worker on first use. `hibana build` produces `.hibana/build/app.wasm`.
+Open **http://127.0.0.1:8787** and edit `src/index.ts`. The local runtime is downloaded
+automatically on first use. Project settings live in `hibana.json`.
+
+## Deploy
+
+Sign in with your Hibana management API URL and tenant name:
 
 ```sh
-hibana login --help
-hibana deploy --help
-hibana --help
+hibana login --url https://api.example.com --tenant team
+hibana deploy
 ```
 
-Use connection profiles for remote deployments. Credentials stay in local profile storage;
-application secrets are managed with `hibana secret`. Infrastructure administration commands
-(`hibana platform ...`) belong to the private operator tools, and are not in this package.
+Login saves your connection for subsequent commands. Deploy builds the app and
+activates a new version. For CI, set `HIBANA_URL` and `HIBANA_TOKEN`.
 
-## Repository layout
+## Commands
 
-- `src/`: TypeScript commands, HTTP client, authentication and build orchestration.
-- `assets/`: three required Wasm/compiler archives and their pinned manifest.
-- `wit/`: required public WebAssembly interface definitions.
-- `test/` and `scripts/`: CLI regression and fresh-package verification.
-- `THIRD_PARTY_LICENSES.txt`: consolidated notices for the bundled assets.
+| Command | Purpose |
+| --- | --- |
+| `hibana build` | Build a WebAssembly component at `.hibana/build/app.wasm` |
+| `hibana tail` | Stream live application logs |
+| `hibana list` | List deployed apps |
+| `hibana rollback` | Restore the previous version |
+| `hibana secret` | Manage application secrets |
+| `hibana profile` | Manage saved connections |
 
-Runtime/compiler asset production is maintained with the private Hibana backend.
-The public CLI consumes the pinned assets; normal installation and operation need
-neither Rust nor C++ compilers. No backend administration commands are included.
+Run `hibana --help` for all commands or `hibana <command> --help` for options.
 
 ## Platforms
 
-| Capability | Linux | macOS | Windows |
-| --- | --- | --- | --- |
-| CLI, login, profiles, remote deployment | Yes | Yes | Yes |
-| TypeScript/Hono component build | Yes | Yes | Yes |
-| Native local Worker / `hibana dev` | x64, arm64 | x64, arm64 | Use WSL2 |
-
-The CLI uses Node.js APIs and a bundled WASI composition helper. Users do not need Rust,
-Docker, a shell script installer, or a separately installed `wac` binary to build applications.
-Windows native Worker support is a separate runtime concern; TypeScript alone does not port
-Wasmtime or the Worker to Windows. CI tests the public CLI and packed build on all three OSes.
-POSIX process/signal and native Worker lifecycle tests run on Linux and macOS.
-
-## Versions and migration
-
-CLI `0.4.0-rc.3` is independently versioned and targets Worker `0.3.0-rc.5`.
-Worker binaries are distributed from this repository's `runtime-v<version>` releases,
-with `SHA256SUMS` and third-party license archives. These releases contain compiled runtimes,
-not private backend source code. Public npm releases contain only the CLI, compiler assets,
-WIT interfaces, templates, and notices.
-
-Update existing applications with:
-
-```sh
-npm install --save-dev @yukiharada1228/hibana@latest
-```
-
-The previous Rust CLI's automatic runtime download points at the old repository. After that
-repository becomes private, update the CLI before installing a new local runtime. Already
-installed runtimes and `runtime install --from FILE --sha256 HASH` continue to work.
-Backend versions, CLI releases and production deployments no longer trigger each other.
+Building and deploying work on Linux, macOS, and Windows. Local development
+(`hibana dev`) supports Linux and macOS on x64 and arm64; use WSL2 on Windows.
 
 ## Development
 
@@ -82,22 +58,10 @@ npm test
 npm run test:package
 ```
 
-Set `HIBANA_RUNTIME_BIN` to a compatible Worker executable when running `test:package` to
-also check real HTTP responses and graceful shutdown. The packaged smoke test installs into
-a fresh path containing spaces, builds Hono with `node:crypto`, and validates the component.
+Set `HIBANA_RUNTIME_BIN` to a compatible runtime executable to include local HTTP
+and shutdown checks in `test:package`.
 
-`assets/engine.json` pins upstream engine revisions and asset digests. Package
-verification checks those digests before testing. Rust dependency notices for the
-bundled Node primitives remain inside `assets/node-runtime.tar.gz`; the engine
-and composition helper notices are consolidated in `THIRD_PARTY_LICENSES.txt`.
-Required upstream source links are retained in that notice file.
+## License
 
-## Releasing
-
-CI must pass on Linux, macOS and Windows. Bump package and lockfile versions together and
-push `v<package version>`. `.github/workflows/release.yml` publishes the tested tarball using
-npm trusted publishing (GitHub OIDC), then creates the CLI GitHub Release. The existing `latest` channel
-continues to receive the current CLI candidate, so ordinary npx users migrate too. Runtime
-tags never publish npm packages.
-Configure the npm trusted publisher for owner `yukiharada1228`, repository `hibana-cli`,
-workflow `release.yml` (no environment). No npm publishing token is stored in GitHub.
+[MIT](LICENSE). Bundled dependencies have their own licenses; see
+[third-party notices](THIRD_PARTY_LICENSES.txt).
