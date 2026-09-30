@@ -1,0 +1,34 @@
+{
+  "componentize-js-LICENSE": {
+    "url": "https://raw.githubusercontent.com/bytecodealliance/ComponentizeJS/ab6483f82ee47df4b0eab74a2533e24075fdbb83/LICENSE",
+    "sha256": "268872b9816f90fd8e85db5a28d33f8150ebb8dd016653fb39ef1f94f2686bc5"
+  },
+  "starlingmonkey-LICENSE": {
+    "url": "https://raw.githubusercontent.com/bytecodealliance/StarlingMonkey/6cdcc0e8ba3cc8a80e026af3c0867a1f63e57d2a/LICENSE",
+    "sha256": "545af604b2f688bf0cdfd57ac01bb6ddcd75b3e8ce98df9763e80d3bb677f4e4"
+  },
+  "spidermonkey-LICENSE": {
+    "url": "https://raw.githubusercontent.com/bytecodealliance/firefox/FIREFOX_140_0_4_RELEASE_STARLING/LICENSE",
+    "sha256": "a799adf18bfb1911f16086dc0e2a6d1cd0e31272f47e7ee6841b465b74d249de"
+  },
+  "spidermonkey-about-license.html": {
+    "url": "https://raw.githubusercontent.com/bytecodealliance/firefox/FIREFOX_140_0_4_RELEASE_STARLING/toolkit/content/license.html",
+    "sha256": "d10965daab0b819bef778c629a94cdd094ffb4ede37239b3d263884a574352c0"
+  },
+  "openssl-LICENSE": {
+    "url": "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0.17/LICENSE.txt",
+    "sha256": "7d5450cb2d142651b8afa315b5f238efc805dad827d91ba367d8516bc9d49e7a"
+  },
+  "picosha2.h": {
+    "url": "https://raw.githubusercontent.com/bytecodealliance/StarlingMonkey/6cdcc0e8ba3cc8a80e026af3c0867a1f63e57d2a/deps/include/picosha2.h",
+    "sha256": "b6fa92f5ae70101b980b1b3321919a5dbf5144ca6180a74290328f5b4c15b759"
+  },
+  "wasi-libc-LICENSE": {
+    "url": "https://raw.githubusercontent.com/WebAssembly/wasi-libc/main/LICENSE",
+    "sha256": "2711a8b5a5cdfef0e639f96c1aca12ae23d7d64a02d0507f1bdf14d2b27bbc3a"
+  },
+  "llvm-LICENSE": {
+    "url": "https://raw.githubusercontent.com/llvm/llvm-project/llvmorg-21.1.0/LICENSE.TXT",
+    "sha256": "8d85c1057d742e597985c7d4e6320b015a9139385cff4cbae06ffc0ebe89afee"
+  }
+}
