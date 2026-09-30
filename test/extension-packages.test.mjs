@@ -8,7 +8,7 @@ import {createServer} from 'node:https';
 import {setTimeout as delay} from 'node:timers/promises';
 import {mkdtemp,mkdir,writeFile,readFile,rm,readdir,symlink} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
-import {join,dirname} from 'node:path';
+import {join,dirname,basename} from 'node:path';
 import {build} from 'esbuild';
 import {resolveExtensions} from '../dist/extensions.js';
 import {extensionImports} from '../dist/extension-imports.js';
