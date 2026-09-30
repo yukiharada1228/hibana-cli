@@ -44,7 +44,7 @@ POSIX process/signal and native Worker lifecycle tests run on Linux and macOS.
 
 ## Versions and migration
 
-CLI `0.4.0-rc.1` is independently versioned and targets Worker `0.3.0-rc.5`.
+CLI `0.4.0-rc.2` is independently versioned and targets Worker `0.3.0-rc.5`.
 Worker binaries are distributed from this repository's `runtime-v<version>` releases,
 with `SHA256SUMS` and third-party license archives. These releases contain compiled runtimes,
 not private backend source code. Public npm releases contain only the CLI, compiler assets,
@@ -80,7 +80,8 @@ a fresh path containing spaces, builds Hono with `node:crypto`, and validates th
 `assets/compose.wasm`. Update `assets/checksums.json` when intentionally changing an asset.
 The other assets are pinned compiler/runtime distribution artifacts imported from Hibana
 0.3.0-rc.5. See `assets/engine.json`, `THIRD_PARTY_LICENSES.txt` and `licenses/` for provenance
-and notices. They do not contain service credentials or infrastructure configuration.
+and notices. The patched engine source inputs are in `tools/engine/`. These assets
+do not contain service credentials or infrastructure configuration.
 
 ## Releasing
 
