@@ -11,7 +11,7 @@ import { dirname, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 const SDK_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-// build.mjs owns staging, cleanup and atomic publication for every language.
+// build.ts owns staging, cleanup and atomic publication for every language.
 export async function compileJavaScript(config, out: string, extensions: ExtensionPlan & BuildOptions) {
   const work = dirname(out);
   const select = await installNodeCompat(extensions, work);

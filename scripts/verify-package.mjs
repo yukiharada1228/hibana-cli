@@ -5,9 +5,15 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 import { createServer } from "node:net";
+import { createHash } from "node:crypto";
 import { run } from "../dist/process.js";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
+const { files } = JSON.parse(await readFile(new URL("../assets/engine.json", import.meta.url), "utf8"));
+for (const [name, expected] of Object.entries(files)) {
+  const bytes = await readFile(new URL(`../assets/${name}`, import.meta.url));
+  assert.equal(createHash("sha256").update(bytes).digest("hex"), expected, `Bundled asset: ${name}`);
+}
 const temporary = await mkdtemp(join(tmpdir(), "hibana packaged "));
 let child;
 try {

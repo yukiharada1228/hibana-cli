@@ -4,4 +4,3 @@ dist/
 .hibana/
 coverage/
 .DS_Store
-tools/compose/target/

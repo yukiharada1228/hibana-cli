@@ -28,25 +28,17 @@ Use connection profiles for remote deployments. Credentials stay in local profil
 application secrets are managed with `hibana secret`. Infrastructure administration commands
 (`hibana platform ...`) belong to the private operator tools, and are not in this package.
 
-## Repository layout and languages
+## Repository layout
 
-The command implementation is TypeScript. Bundled compiler dependencies and
-maintenance tools have different implementation languages:
+- `src/`: TypeScript commands, HTTP client, authentication and build orchestration.
+- `assets/`: three required Wasm/compiler archives and their pinned manifest.
+- `wit/`: required public WebAssembly interface definitions.
+- `test/` and `scripts/`: CLI regression and fresh-package verification.
+- `THIRD_PARTY_LICENSES.txt`: consolidated notices for the bundled assets.
 
-| Location | Language/content | Purpose |
-| --- | --- | --- |
-| `src/` | TypeScript | All public commands, HTTP client, authentication, build and dev orchestration |
-| `test/`, `scripts/` | JavaScript | Existing regression tests and package verification; these are not shipped as command implementations |
-| `tools/compose/src/main.rs` | Rust, 21 lines | Calls upstream `wac-graph` to connect Wasm components; compiled to portable `assets/compose.wasm` |
-| `tools/engine/async-context.*` | C++ | Async-context hooks in the bundled SpiderMonkey-based engine |
-| `tools/engine/build-reference.rs` | Rust reference | Archived publisher recipe documenting how the engine asset was built |
-| `licenses/` | HTML/text and upstream notices | Third-party license documents; excluded from GitHub language statistics as vendored material |
-| `assets/`, `wit/` | Wasm/archives and WIT | Compiler assets and the public Component interface contract |
-
-Users run Node.js and the bundled Wasm assets. Neither Rust nor C++ compilation
-is part of installation or normal CLI execution. TypeScript governs the CLI's
-commands; it does not replace the implementation languages of the underlying
-JavaScript engine or WebAssembly composition library.
+Runtime/compiler asset production is maintained with the private Hibana backend.
+The public CLI consumes the pinned assets; normal installation and operation need
+neither Rust nor C++ compilers. No backend administration commands are included.
 
 ## Platforms
 
@@ -64,7 +56,7 @@ POSIX process/signal and native Worker lifecycle tests run on Linux and macOS.
 
 ## Versions and migration
 
-CLI `0.4.0-rc.2` is independently versioned and targets Worker `0.3.0-rc.5`.
+CLI `0.4.0-rc.3` is independently versioned and targets Worker `0.3.0-rc.5`.
 Worker binaries are distributed from this repository's `runtime-v<version>` releases,
 with `SHA256SUMS` and third-party license archives. These releases contain compiled runtimes,
 not private backend source code. Public npm releases contain only the CLI, compiler assets,
@@ -94,14 +86,11 @@ Set `HIBANA_RUNTIME_BIN` to a compatible Worker executable when running `test:pa
 also check real HTTP responses and graceful shutdown. The packaged smoke test installs into
 a fresh path containing spaces, builds Hono with `node:crypto`, and validates the component.
 
-`src/` contains the TypeScript implementation. `tools/compose/` is a small WASI helper around
-`wac-graph`; rebuild it with `cargo build --locked --release --target wasm32-wasip1
---manifest-path tools/compose/Cargo.toml` and copy the resulting `hibana_component_compose.wasm` to
-`assets/compose.wasm`. Update `assets/checksums.json` when intentionally changing an asset.
-The other assets are pinned compiler/runtime distribution artifacts imported from Hibana
-0.3.0-rc.5. See `assets/engine.json`, `THIRD_PARTY_LICENSES.txt` and `licenses/` for provenance
-and notices. The patched engine source inputs are in `tools/engine/`. These assets
-do not contain service credentials or infrastructure configuration.
+`assets/engine.json` pins upstream engine revisions and asset digests. Package
+verification checks those digests before testing. Rust dependency notices for the
+bundled Node primitives remain inside `assets/node-runtime.tar.gz`; the engine
+and composition helper notices are consolidated in `THIRD_PARTY_LICENSES.txt`.
+Required upstream source links are retained in that notice file.
 
 ## Releasing
 

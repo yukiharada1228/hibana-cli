@@ -10,8 +10,6 @@
     "useUnknownInCatchVariables": false,
     "skipLibCheck": true,
     "noEmitOnError": true,
-    "declaration": true,
-    "sourceMap": true,
     "lib": [
       "ESNext",
       "DOM"

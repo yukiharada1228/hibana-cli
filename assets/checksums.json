@@ -1,6 +1,0 @@
-{
-  "compose.wasm": "05ca4319dbb55b244d81288be2b6ddd20c3f0007d29b18cc3568add67f079eb5",
-  "engine.json": "3eaa3a25667cb4f6f3dbbbf68ae375860fcdcb7372a23d9a6da98066fb35ecc5",
-  "starlingmonkey_embedding.wasm.gz": "818b7bdfa915d12c7a5c37ec1dcc674c04a5ff8b63963ed4d6561c7b9f9150f2",
-  "node-runtime.tar.gz": "6498beb322b84a0fefeb7ed4e5bc7be7d60fee53dbcd3ca50e48397040600d23"
-}

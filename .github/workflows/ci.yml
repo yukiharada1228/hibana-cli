@@ -26,6 +26,4 @@ jobs:
       - run: npm test
       - name: Install tarball and build Hono with Node crypto
         run: npm run test:package
-      - name: Check bundled asset integrity
-        run: node scripts/verify-assets.mjs
       - run: npm audit --omit=dev --audit-level=high

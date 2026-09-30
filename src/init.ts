@@ -1,11 +1,11 @@
 import { isApplicationName } from "./application-name.js";
-import { cp, mkdir, readdir, writeFile } from "node:fs/promises";
-import { resolve, join, dirname, basename } from "node:path";
-import { fileURLToPath } from "node:url";
+import { mkdir, readdir, writeFile } from "node:fs/promises";
+import { resolve, join, basename } from "node:path";
 import { run } from "./process.js";
 import { packageInfo } from "./package.js";
 
-const sdk = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const templateSource =
+  "import { Hono } from 'hono'\n\nconst app = new Hono()\n\napp.get('/', (c) => c.text('Hello from Hono on Hibana 🔥'))\n\nexport default app\n";
 export const templates = ["hono"];
 function shellPath(path) {
   return /^[a-zA-Z0-9_./-]+$/.test(path)
@@ -35,40 +35,38 @@ export async function init(
     throw new Error(
       `Directory is not empty: ${root}\nChoose a new directory, for example hibana init my-api.`,
     );
-  await cp(join(sdk, "templates", template), root, { recursive: true });
+  await mkdir(join(root, "src"));
+  await writeFile(join(root, "src/index.ts"), templateSource);
   const config: Record<string, unknown> = {
     name,
     secrets: [],
-    vars: template === "hono" ? {} : { GREETING: "Hello Hibana" },
+    vars: {},
     limits: { memory_mb: 256, timeout_ms: 15000 },
   };
-  const javascript = template === "hono" || template === "javascript";
   const { name: cliName, version } = await packageInfo();
-  if (javascript) {
-    config.main = "src/index.ts";
-    await writeFile(
-      join(root, "package.json"),
-      JSON.stringify(
-        {
-          name,
-          private: true,
-          type: "module",
-          scripts: {
-            dev: "hibana dev",
-            build: "hibana build",
-            deploy: "hibana deploy",
-          },
-          ...(template === "hono" ? { dependencies: { hono: "^4.6.0" } } : {}),
-          devDependencies: {
-            [cliName]: cliPackage ? `file:${resolve(cliPackage)}` : version,
-          },
-          engines: { node: ">=24" },
+  config.main = "src/index.ts";
+  await writeFile(
+    join(root, "package.json"),
+    JSON.stringify(
+      {
+        name,
+        private: true,
+        type: "module",
+        scripts: {
+          dev: "hibana dev",
+          build: "hibana build",
+          deploy: "hibana deploy",
         },
-        null,
-        2,
-      ) + "\n",
-    );
-  }
+        dependencies: { hono: "^4.6.0" },
+        devDependencies: {
+          [cliName]: cliPackage ? `file:${resolve(cliPackage)}` : version,
+        },
+        engines: { node: ">=24" },
+      },
+      null,
+      2,
+    ) + "\n",
+  );
 
   await writeFile(
     join(root, "hibana.json"),
@@ -76,13 +74,12 @@ export async function init(
   );
   await writeFile(
     join(root, ".gitignore"),
-    "node_modules/\n.hibana/\n.dev.vars\ntarget/\n*.wasm\n" +
-      (template === "go" ? "# Generated WIT bindings\nbindings/\n" : ""),
+    "node_modules/\n.hibana/\n.dev.vars\ntarget/\n*.wasm\n",
   );
   console.log(`Created ${root}`);
   const changeDirectory =
     root === process.cwd() ? [] : [`cd ${shellPath(root)}`];
-  if (javascript && install) {
+  if (install) {
     console.log("Installing project dependencies...");
     try {
       await run("npm", ["install"], { cwd: root });
@@ -95,14 +92,8 @@ export async function init(
   }
   const next = [
     ...changeDirectory,
-    ...(javascript && !install ? ["npm install"] : []),
-    javascript ? "npm run dev" : `npx -y ${cliName}@${version} dev`,
+    ...(!install ? ["npm install"] : []),
+    "npm run dev",
   ];
   console.log(`\nNext:\n${next.map((command) => `  ${command}`).join("\n")}`);
-  if (!javascript)
-    console.log(
-      template === "rust"
-        ? "\nRequires Rust and the wasm32-wasip2 target (rustup target add wasm32-wasip2)."
-        : "\nRequires Go; the project's componentize-go tool is installed by go tool on first use.",
-    );
 }
