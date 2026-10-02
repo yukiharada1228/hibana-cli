@@ -15,8 +15,8 @@ export interface ExtensionPlan {
   witDirectories: string[]; packages: Record<string, string>; metadata: JsonObject;
 }
 export interface ProcessOptions extends SpawnOptions {
-  stopTimeoutMs?: number; capture?: boolean; maxBuffer?: number; timeout?: number;
+  input?: string; stopTimeoutMs?: number; capture?: boolean; maxBuffer?: number; timeout?: number;
 }
 export interface RequestOptions { method?: string; body?: any; auth?: boolean; signal?: AbortSignal }
 export interface BrowserOptions { noBrowser?: boolean; open?: (url: string) => Promise<void>; timeoutMs?: number; signal?: AbortSignal; log?: (message: string) => void }
-export interface RuntimeOptions { fetcher?: typeof fetch; home?: string; target?: string; signal?: AbortSignal }
+export interface RuntimeOptions { fetcher?: typeof fetch; home?: string; target?: string; signal?: AbortSignal; log?: (message: string) => void }

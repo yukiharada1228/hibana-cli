@@ -120,14 +120,19 @@ export async function deploy(api, config, artifact, version) {
   form.set("version", version);
   form.set("activate", "true");
   form.set("ingress", "true");
-  form.set("vars", JSON.stringify(config.vars));
-  form.set("secrets", JSON.stringify(config.secrets ?? []));
-  form.set("resource_limits", JSON.stringify(config.resources));
-  // Stream the immutable build snapshot without copying the whole Wasm into a Blob.
+  if (!config.assets) {
+    form.set("vars", JSON.stringify(config.vars));
+    form.set("secrets", JSON.stringify(config.secrets ?? []));
+    // Older servers reject unknown fields; omission also clears bindings on a new version.
+    if (Object.keys(config.databases || {}).length)
+      form.set("databases", JSON.stringify(config.databases));
+    form.set("resource_limits", JSON.stringify(config.resources));
+  }
+  // Upload the immutable snapshot without copying the whole artifact.
   form.set(
-    "wasm",
-    await openAsBlob(artifact, { type: "application/wasm" }),
-    "component.wasm",
+    config.assets ? "assets" : "wasm",
+    await openAsBlob(artifact, { type: config.assets ? "application/x-tar" : "application/wasm" }),
+    config.assets ? "assets.tar" : "component.wasm",
   );
   const result = await api.request(`${base}/versions`, {
     method: "POST",

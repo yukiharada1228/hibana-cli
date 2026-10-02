@@ -10,6 +10,20 @@ const component = { component_id: "cmp_fixture", name: config.name };
 const json = (value, status = 200) =>
   new Response(JSON.stringify(value), { status });
 
+test("Wasm deployments keep the legacy upload contract until a database is bound", async t => {
+  const { api, artifact } = await fixture(t, ({ method, body }) => {
+    if (method === "GET") return json([component]);
+    const expected = ["activate", "ingress", "resource_limits", "secrets", "vars", "version", "wasm"];
+    if (body.get("version") === "with-db") expected.push("databases");
+    assert.deepEqual([...body.keys()].sort(), expected.sort());
+    if (body.has("databases")) assert.deepEqual(JSON.parse(body.get("databases")), { DB: "db_0123456789abcdef0123456789abcdef" });
+    return json({ version_id: "ver_fixture" }, 201);
+  });
+  await deploy(api, config, artifact, "legacy");
+  await deploy(api, { ...config, databases: {} }, artifact, "empty-db");
+  await deploy(api, { ...config, databases: { DB: "db_0123456789abcdef0123456789abcdef" } }, artifact, "with-db");
+});
+
 async function fixture(t, respond) {
   const home = await mkdtemp(join(tmpdir(), "hibana-api-"));
   const previous = {

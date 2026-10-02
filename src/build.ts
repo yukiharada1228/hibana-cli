@@ -38,6 +38,7 @@ async function checkComponent(path) {
 
 export async function build(config, options: BuildOptions = {}) {
   options.signal?.throwIfAborted();
+  if (config.assets) return (await import("./static-sites.js")).buildStatic(config, options);
   const extensions = await resolveExtensions(config, options);
   options.signal?.throwIfAborted();
   if (

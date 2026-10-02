@@ -91,7 +91,7 @@ test("invalid commands, flags and arguments fail before any project or network w
     [["dev", "--no-runtime-install"], /Unknown option/],
     [["delete", "hello", "--force"], /Unknown option/],
     [["delete", "--name", "hello"], /Unknown option/],
-    [["platform", "status", "--local"], /Unknown option/],
+    [["platform", "status", "--local"], /Unknown command 'platform'/],
     [["runtime", "instal"], /Did you mean 'install'/],
     [["profile", "ues", "prod"], /Unknown profile command/],
     [["dev", "extra"], /Usage: hibana dev/],

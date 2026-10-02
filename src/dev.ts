@@ -1,11 +1,11 @@
 import { spawn } from "node:child_process";
-import { access, readFile, writeFile, chmod, mkdir } from "node:fs/promises";
-import { constants, watch } from "node:fs";
+import { readFile, writeFile, chmod, mkdir } from "node:fs/promises";
+import { watch } from "node:fs";
 import { parseEnv } from "node:util";
-import { dirname, resolve, join, delimiter } from "node:path";
+import { dirname, resolve, join } from "node:path";
 import { loadConfig } from "./config.js";
 import { isInside } from "./paths.js";
-import { installedRuntime, installRuntime } from "./runtime.js";
+import { localRuntime, requireManagedSql } from "./local-runtime.js";
 import { resolveExtensions } from "./extensions.js";
 import {
   isLocalExtension,
@@ -64,6 +64,7 @@ export function shouldRebuild(config, file) {
 }
 
 export async function dev(config, options, build) {
+  if (config.assets) return (await import("./static-sites.js")).devStatic(config, options);
   const port = Number(options.port || 8787);
   if (!Number.isInteger(port) || port < 1 || port > 65535)
     throw new Error("port must be 1..65535");
@@ -107,6 +108,9 @@ export async function dev(config, options, build) {
     } catch (error) {
       if (error.code !== "ENOENT") throw error;
     }
+    for (const name of Object.keys(config.databases || {}))
+      if (Object.hasOwn(local, name)) throw new Error(`.dev.vars conflicts with database binding ${name}`);
+    if (Object.keys(config.databases || {}).length) await requireManagedSql(runtime, builds.signal);
     if (stopping) return;
     await stopChild();
     await mkdir(dirname(settings), { recursive: true });
@@ -115,6 +119,11 @@ export async function dev(config, options, build) {
       JSON.stringify({
         vars: { ...config.vars, ...local },
         resources: config.resources,
+        // Keep non-database apps compatible with older strict settings decoders.
+        ...(Object.keys(config.databases || {}).length ? {
+          databases: config.databases,
+          databases_dir: join(config.root, ".hibana/databases"),
+        } : {}),
         ...(localNetwork.allow_outbound.length
           ? { net_allow_outbound: localNetwork.allow_outbound }
           : {}),
@@ -161,7 +170,9 @@ export async function dev(config, options, build) {
     }
     rebuilding = true;
     try {
-      config = await loadConfig(config.path);
+      const updated = await loadConfig(config.path);
+      if (updated.assets) throw new Error("Restart hibana dev after switching to a static site");
+      config = updated;
       await start();
     } catch (error) {
       if (!stopping) console.error(`Build failed: ${error.message}`);
@@ -195,32 +206,9 @@ export async function dev(config, options, build) {
   try {
     await resolveExtensions(config, extensionOptions);
     builds.signal.throwIfAborted();
-    runtime = options.runtime || process.env.HIBANA_RUNTIME_BIN;
-    if (!runtime) runtime = await installedRuntime();
-    if (!runtime) {
-      for (const directory of (process.env.PATH || "")
-        .split(delimiter)
-        .filter(Boolean)) {
-        const candidate = join(directory, "hibana-worker");
-        try {
-          await access(candidate, constants.X_OK);
-          runtime = candidate;
-          break;
-        } catch {}
-      }
-    }
-    if (!runtime) {
-      console.log(
-        "Local Hibana runtime not found. Downloading the compatible local runtime...",
-      );
-      try {
-        runtime = await installRuntime({}, { signal: builds.signal });
-      } catch (error) {
-        throw new Error(
-          `Could not prepare the local runtime: ${error.message}\nCheck your connection and run hibana dev again.\nFor offline setup, run hibana runtime install --from FILE --sha256 HASH, or use --runtime PATH.`,
-          { cause: error },
-        );
-      }
+    try { runtime = await localRuntime(options, builds.signal); }
+    catch (error) {
+      throw new Error(`Could not prepare the local runtime: ${error.message}\nCheck your connection and run hibana dev again.\nFor offline setup, run hibana runtime install --from FILE --sha256 HASH, or use --runtime PATH.`, { cause: error });
     }
     if (!stopping) await start();
     if (!stopping && !options["no-watch"]) {

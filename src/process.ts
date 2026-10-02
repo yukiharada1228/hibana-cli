@@ -7,6 +7,7 @@ import spawn from "cross-spawn";
 export function run(command: string, args: string[], options: ProcessOptions = {}) {
   const {
     signal,
+    input,
     stopTimeoutMs = 5000,
     capture = false,
     maxBuffer = 2 * 1024 * 1024,
@@ -17,12 +18,16 @@ export function run(command: string, args: string[], options: ProcessOptions = {
     signal?.throwIfAborted();
     const grouped = process.platform !== "win32";
     const child = spawn(command, args, {
-      stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit",
+      stdio: capture ? [input === undefined ? "ignore" : "pipe", "pipe", "pipe"] : input === undefined ? "inherit" : ["pipe", "inherit", "inherit"],
       ...spawnOptions,
       detached: grouped,
       shell: false,
     });
     let failure, killTimer, timeoutTimer;
+    if (input !== undefined) {
+      child.stdin!.on("error", (error: NodeJS.ErrnoException) => { if (error.code !== "EPIPE") cancel("SIGTERM", error); });
+      child.stdin!.end(input);
+    }
     const output: Record<string, Buffer[]> = { stdout: [], stderr: [] };
     const sizes: Record<string, number> = { stdout: 0, stderr: 0 };
     function sendSignal(value) {

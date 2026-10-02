@@ -48,6 +48,12 @@ async function main() {
     console.log(helpText);
     return;
   }
+  if (command === "db") {
+    const { databaseCommand } = await import("./databases.js");
+    const result = await interruptible(signal => databaseCommand(args, values, signal));
+    if (result !== undefined) console.log(JSON.stringify(result, null, 2));
+    return;
+  }
   if (command === "runtime") {
     const { installRuntime } = await import("./runtime.js");
     return interruptible((signal) => installRuntime(values, { signal }));

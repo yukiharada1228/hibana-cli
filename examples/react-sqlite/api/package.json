@@ -1,0 +1,18 @@
+{
+  "name": "hibana-notes-api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "hibana dev",
+    "build": "hibana build",
+    "deploy": "hibana deploy",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "hono": "4.13.7"
+  },
+  "devDependencies": {
+    "@yukiharada1228/hibana": "0.4.0-rc.4",
+    "typescript": "5.9.3"
+  }
+}

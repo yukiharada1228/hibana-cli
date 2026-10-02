@@ -1,6 +1,6 @@
 {
   "name": "@yukiharada1228/hibana",
-  "version": "0.4.0-rc.3",
+  "version": "0.4.0-rc.4",
   "description": "TypeScript CLI for Hibana applications",
   "type": "module",
   "bin": {
@@ -27,14 +27,16 @@
     "wit/",
     "assets/",
     "THIRD_PARTY_LICENSES.txt",
-    "LICENSE"
+    "LICENSE",
+    "types/"
   ],
   "scripts": {
     "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc",
     "check": "tsc --noEmit",
     "test": "npm run build && node scripts/test.mjs",
     "prepack": "npm run build",
-    "test:package": "node scripts/verify-package.mjs"
+    "test:package": "node scripts/verify-package.mjs",
+    "test:apps": "npm run build && node scripts/verify-spa-db.mjs"
   },
   "dependencies": {
     "@bytecodealliance/componentize-js": "0.19.3",
@@ -50,5 +52,11 @@
     "@types/semver": "^7.7.1",
     "hono": "^4.6.0",
     "typescript": "^5.9.3"
+  },
+  "exports": {
+    "./database": {
+      "types": "./types/database.d.ts"
+    },
+    "./package.json": "./package.json"
   }
 }

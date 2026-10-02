@@ -100,6 +100,7 @@ export async function installRuntime(
     home,
     target = runtimeTarget(),
     signal: cancellation,
+    log = console.log,
   }: RuntimeOptions = {},
 ) {
   cancellation?.throwIfAborted();
@@ -175,7 +176,7 @@ export async function installRuntime(
   } finally {
     await rm(temporary, { force: true });
   }
-  console.log(
+  log(
     `Installed hibana-worker ${version} (${target}) at ${destination}`,
   );
   return destination;
