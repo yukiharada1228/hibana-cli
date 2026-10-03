@@ -64,7 +64,12 @@ export function shouldRebuild(config, file) {
 }
 
 export async function dev(config, options, build) {
-  if (config.assets) return (await import("./static-sites.js")).devStatic(config, options);
+  if (config.assets) {
+    if (options["persist-to"]) throw new Error("--persist-to is only used for local database storage");
+    return (await import("./static-sites.js")).devStatic(config, options);
+  }
+  const databaseDirectory = resolve(options["persist-to"] || join(config.root, ".hibana/databases"));
+  if (options["persist-to"] && isInside(databaseDirectory, config.root)) throw new Error("Use a dedicated --persist-to directory, not the project directory or an ancestor");
   const port = Number(options.port || 8787);
   if (!Number.isInteger(port) || port < 1 || port > 65535)
     throw new Error("port must be 1..65535");
@@ -122,7 +127,7 @@ export async function dev(config, options, build) {
         // Keep non-database apps compatible with older strict settings decoders.
         ...(Object.keys(config.databases || {}).length ? {
           databases: config.databases,
-          databases_dir: join(config.root, ".hibana/databases"),
+          databases_dir: databaseDirectory,
         } : {}),
         ...(localNetwork.allow_outbound.length
           ? { net_allow_outbound: localNetwork.allow_outbound }
@@ -213,7 +218,7 @@ export async function dev(config, options, build) {
     if (!stopping) await start();
     if (!stopping && !options["no-watch"]) {
       watcher = watch(config.root, { recursive: true }, (_, file) => {
-        if (!file || !shouldRebuild(config, file)) return;
+        if (!file || isInside(databaseDirectory, resolve(config.root, String(file))) || !shouldRebuild(config, file)) return;
         clearTimeout(timer);
         timer = setTimeout(() => {
           if (rebuilding) dirty = true;

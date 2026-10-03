@@ -83,7 +83,7 @@ test("invalid commands, flags and arguments fail before any project or network w
     [["tail", "--before", "cursor"], /Unknown option '--before'/],
     [["tail", "--errors-only"], /Unknown option '--errors-only'/],
     [["dev", "--por", "3000"], /Did you mean '--port'/],
-    [["deploy", "--dry-run"], /--dry-run.*not supported.*deploy/],
+    [["deploy", "--local"], /--local.*not supported.*deploy/],
     [["deploy", "--profile", ""], /--profile.*requires a non-empty NAME/],
     [["dev", "--runtime", ""], /--runtime.*requires a non-empty PATH/],
     [["delete", "hello", "--port", "3000"], /--port.*not supported.*delete/],

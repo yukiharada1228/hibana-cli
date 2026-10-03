@@ -32,7 +32,7 @@ On Windows, run the API inside WSL2. No backend source checkout is needed.
 In the API directory:
 
 ```sh
-npm exec -- hibana db migrate DB --local --file migrations/0001_notes.sql
+npm exec -- hibana db migrations apply DB --local
 npm run dev
 ```
 
@@ -70,7 +70,7 @@ API and frontend distinct names. Then:
 
 ```sh
 npm exec -- hibana db grant DB
-npm exec -- hibana db migrate DB --remote --file migrations/0001_notes.sql
+npm exec -- hibana db migrations apply DB --remote
 npm exec -- hibana secret put API_TOKEN < /path/to/private-token.txt
 npm exec -- hibana secret allow-deploy API_TOKEN
 npm run deploy

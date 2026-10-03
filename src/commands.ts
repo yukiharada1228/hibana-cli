@@ -128,9 +128,14 @@ const options: Record<string, Option> = {
   }
 };
 Object.assign(options, {
+  cwd: { type: "string", value: "DIRECTORY", description: "Run in this working directory" },
+  command: { type: "string", value: "SQL", description: "SQL statements to execute" },
+  "migrations-dir": { type: "string", value: "DIRECTORY", description: "Migration directory relative to the config (default: migrations)" },
+  "persist-to": { type: "string", value: "DIRECTORY", description: "Directory for local SQLite data" },
+  outdir: { type: "string", value: "DIRECTORY", description: "Save the built artifact (with --dry-run)" },
   local: { type: "boolean", description: "Use the project's local SQLite files" },
   remote: { type: "boolean", description: "Use the database on the selected platform" },
-  file: { type: "string", value: "FILE", description: "UTF-8 SQL migration file" },
+  file: { type: "string", value: "FILE", description: "UTF-8 SQL file" },
   sql: { type: "string", value: "SQL", description: "One parameterized SQL statement" },
   params: { type: "string", value: "JSON", description: "JSON array of SQL parameters" },
   "read-only": { type: "boolean", description: "Grant only read access" },
@@ -488,6 +493,22 @@ commands.db = {
   },
 };
 
+commands.init.flags!.push("yes");
+commands.dev.flags!.push("local", "persist-to");
+commands.deploy.flags!.push("dry-run", "outdir");
+commands.deploy.notes += "\n--dry-run builds and validates without authentication or contacting the server.";
+commands.whoami = { description: "Show the current authenticated account", usage: "hibana whoami", flags: ["profile", "url", "json"], min: 0, max: 0 };
+const databaseFlags = ["config", "profile", "url", "local", "remote", "runtime", "persist-to", "json"];
+commands.db.actions!.info = { description: "Show database information", usage: "hibana db info DATABASE", flags: ["config", "profile", "url", "json"], min: 1, max: 1 };
+commands.db.actions!.execute = { description: "Execute SQL text or a SQL file", usage: "hibana db execute DATABASE", flags: [...databaseFlags, "command", "file", "params", "yes"], min: 1, max: 1, examples: ["hibana db execute DB --local --command 'SELECT 1'", "hibana db execute DB --remote --file schema.sql"], notes: "Specify --command or --file and exactly one of --local / --remote. Each input runs atomically. Stop hibana dev before local SQL." };
+commands.db.actions!.migrations = { description: "Create, inspect and apply numbered SQL migrations", actions: {
+  create: { description: "Create the next numbered migration file", usage: "hibana db migrations create DATABASE NAME", flags: ["config", "migrations-dir"], min: 2, max: 2 },
+  list: { description: "Show pending and applied migrations and detect changed files", usage: "hibana db migrations list DATABASE", flags: [...databaseFlags, "migrations-dir"], min: 1, max: 1 },
+  apply: { description: "Apply pending migrations in filename order", usage: "hibana db migrations apply DATABASE", flags: [...databaseFlags, "migrations-dir", "yes"], min: 1, max: 1, examples: ["hibana db migrations apply DB --local", "hibana db migrations apply DB --remote"], notes: "Review pending migrations, then confirm. Use --yes in CI. Each file is atomic; earlier successful files stay applied if a later one fails." },
+}};
+for (const action of ["query", "migrate"]) commands.db.actions![action].flags!.push("persist-to", "json");
+for (const action of ["list", "create", "delete"]) commands.db.actions![action].flags!.push("json", "config");
+
 function rows(entries: string[][]) {
   const width = Math.max(...entries.map(([label]) => label.length));
   return entries
@@ -509,7 +530,7 @@ Development:
 ${rows(["init", "dev", "build", "deploy"].map((name) => [name, commands[name].description]))}
 
 Applications and connections:
-${rows(["login", "logout", "list", "tail", "rollback", "delete", "secret", "db", "egress", "profile"].map((name) => [name, commands[name].description]))}
+${rows(["login", "logout", "whoami", "list", "tail", "rollback", "delete", "secret", "db", "egress", "profile"].map((name) => [name, commands[name].description]))}
 
 Advanced:
 ${rows(["runtime"].map((name) => [name, commands[name].description]))}
@@ -517,11 +538,12 @@ ${rows(["runtime"].map((name) => [name, commands[name].description]))}
 Run hibana <command> --help for options and examples.
 Use --profile NAME on remote commands to select a saved connection.
 hibana --version shows the installed CLI version.`;
-  const parent = commands[command],
-    spec = action ? parent.actions![action] : parent;
+  let spec = commands[command];
+  for (const name of action?.split(" ") || []) spec = spec.actions![name];
+  const path = [command, action].filter(Boolean).join(" ");
   if (spec.actions)
-    return `${spec.description}\n\nUsage: hibana ${command} <command>\n\nCommands:\n${rows(Object.entries(spec.actions).map(([name, item]) => [name, item.description]))}\n\nRun hibana ${command} <command> --help for options and examples.`;
-  const flags = [...(spec.flags || []), "help"];
+    return `${spec.description}\n\nUsage: hibana ${path} <command>\n\nCommands:\n${rows(Object.entries(spec.actions).map(([name, item]) => [name, item.description]))}\n\nRun hibana ${path} <command> --help for options and examples.`;
+  const flags = [...(spec.flags || []), "cwd", "help"];
   return `${spec.description}\n\nUsage: ${spec.usage} [options]\n\nOptions:\n${rows(
     flags.map((name) => {
       const option = options[name];
@@ -592,20 +614,16 @@ export function parseCommand(argv: string[]): ParsedCommand {
         `Unknown command '${command}'.${suggestion(command, Object.keys(commands))}`,
       );
     context = command;
-    let spec = commands[command],
-      action;
-    if (spec.actions) {
-      [action] = args;
-      if (action) {
-        if (!Object.hasOwn(spec.actions, action))
-          throw new Error(
-            `Unknown ${command} command '${action}'.${suggestion(action, Object.keys(spec.actions))}`,
-          );
-        spec = spec.actions[action];
-        context += ` ${action}`;
-      }
+    let spec = commands[command], depth = 0;
+    while (spec.actions && args[depth]) {
+      const action = args[depth];
+      if (!Object.hasOwn(spec.actions, action))
+        throw new Error(`Unknown ${context} command '${action}'.${suggestion(action, Object.keys(spec.actions))}`);
+      spec = spec.actions[action];
+      context += ` ${action}`;
+      depth++;
     }
-    const allowed = new Set([...(spec.flags || []), "help"]);
+    const allowed = new Set([...(spec.flags || []), "cwd", "help"]);
     for (const [name, value] of Object.entries(values)) {
       if (!allowed.has(name))
         throw new Error(
@@ -616,8 +634,8 @@ export function parseCommand(argv: string[]): ParsedCommand {
           `Option '--${name}' requires a non-empty ${options[name].value}.`,
         );
     }
-    if (values.help || spec.actions) return { helpText: help(command, action) };
-    const positional = action ? args.slice(1) : args;
+    if (values.help || spec.actions) return { helpText: help(command, args.slice(0, depth).join(" ") || undefined) };
+    const positional = args.slice(depth);
     if (positional.length < (spec.min ?? 0) || positional.length > (spec.max ?? 0))
       throw new Error(`Usage: ${spec.usage} [options]`);
     if (spec.secretName && !/^[A-Z_][A-Z0-9_]{0,63}$/.test(positional[0]))

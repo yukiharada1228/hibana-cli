@@ -47,7 +47,7 @@ try {
   if (runtime) {
     const command = args => run(process.execPath, [cli, ...args], { cwd: api, capture: true, timeout: 600000 });
     await writeFile(join(api, ".dev.vars"), "API_TOKEN=local-test-token\n");
-    await command(["db", "migrate", "DB", "--local", "--file", "migrations/0001_notes.sql", "--runtime", runtime]);
+    await command(["db", "migrations", "apply", "DB", "--local", "--yes", "--runtime", runtime]);
     const apiPort = await port(), child = await start(cli, api, apiPort, runtime);
     const url = `http://127.0.0.1:${apiPort}/notes`, headers = { authorization: "Bearer local-test-token", "content-type": "application/json", origin: "http://127.0.0.1:5173" };
     assert.equal((await fetch(url)).status, 401);

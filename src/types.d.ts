@@ -3,7 +3,7 @@ import type { SpawnOptions } from "node:child_process";
 export type JsonObject = Record<string, any>;
 export interface CliOptions {
   [name: string]: string | boolean | undefined;
-  config?: string; profile?: string; url?: string; tenant?: string; token?: string;
+  cwd?: string; "persist-to"?: string; outdir?: string; config?: string; profile?: string; url?: string; tenant?: string; token?: string;
   version?: string; from?: string; sha256?: string; runtime?: string; port?: string;
   template?: string; "cli-package"?: string; format?: string; status?: string;
   search?: string; "version-id"?: string;
