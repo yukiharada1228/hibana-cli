@@ -103,6 +103,18 @@ test("run preserves literal arguments, bounds captured output and removes listen
   assert.deepEqual([process.listenerCount("SIGINT"), process.listenerCount("SIGTERM")], before);
 });
 
+test("explicit stdin works with captured and inherited output, including early child exit", async t => {
+  const cwd = await workspace(t);
+  const input = JSON.stringify({ sql: "SELECT '日本語 🔥'" });
+  const script = "const fs=require('node:fs');const timer=setTimeout(()=>process.exit(9),1000);const chunks=[];process.stdin.on('data',b=>chunks.push(b));process.stdin.on('end',()=>{clearTimeout(timer);fs.writeFileSync('input.json',Buffer.concat(chunks));});";
+  for (const capture of [true, false]) {
+    await run(process.execPath, ["-e", script], { cwd, input, capture, timeout: 2000 });
+    assert.equal(await readFile(join(cwd, "input.json"), "utf8"), input);
+  }
+  await assert.rejects(run(process.execPath, ["-e", "process.exit(2)"], { input: "x".repeat(300000), capture: true }), /failed/);
+  await assert.rejects(run("hibana-missing-input-command", [], { input, capture: true }), /was not found/);
+});
+
 for (const phase of ["initial build", "rebuild"]) {
   test(`dev cancels its real ${phase} and leaves no runtime or next build`, async t => {
     const cwd = await workspace(t);

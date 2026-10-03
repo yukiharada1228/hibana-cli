@@ -26,4 +26,6 @@ jobs:
       - run: npm test
       - name: Install tarball and build Hono with Node crypto
         run: npm run test:package
+      - name: Create React SPA and build React + Hono + SQLite example from tarball
+        run: npm run test:apps
       - run: npm audit --omit=dev --audit-level=high

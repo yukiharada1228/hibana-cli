@@ -167,6 +167,7 @@ test("dev passes only explicit local destinations and keeps local Secrets in pri
   let result = await f.invoke();
   assert.equal(result.code, 0, result.output);
   const settingsPath = join(f.root, ".hibana/dev-settings.json");
+  assert.deepEqual(Object.keys(JSON.parse(await readFile(settingsPath, "utf8"))).sort(), ["resources", "vars"], "legacy workers reject unknown development settings");
   assert.equal(JSON.parse(await readFile(settingsPath, "utf8")).net_allow_outbound, undefined);
   await writeFile(join(f.root, "hibana.json"), JSON.stringify({ ...project, dev: { allow_outbound: ["DB.Example.COM.:05432", "db.example.com:5432"] } }));
   await writeFile(join(f.root, ".dev.vars"), 'DATABASE_URL="local-test-secret"\n');

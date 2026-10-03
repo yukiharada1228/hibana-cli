@@ -20,6 +20,7 @@ export async function compileJavaScript(config, out: string, extensions: Extensi
     shim,
     `
 ${(extensions.preload || []).map((path) => `import ${JSON.stringify(path)};`).join("\n")}
+${Object.keys(config.databases || {}).length ? `import { installDatabases } from ${JSON.stringify(join(SDK_ROOT, "assets/database.mjs"))};` : ""}
 import app from ${JSON.stringify(resolve(config.root, config.main))};
 if (!app || typeof app.fetch !== "function") throw new Error("Default export must expose fetch(request, env, context); a Hono app can be exported directly");
 function decodeEnv(value) {
@@ -33,6 +34,7 @@ addEventListener("fetch", event => {
     const env = raw ? decodeEnv(raw) : {};
     for (const key of Object.keys(globalThis.process.env)) delete globalThis.process.env[key];
     Object.assign(globalThis.process.env, env);
+    ${Object.keys(config.databases || {}).length ? `installDatabases(env, ${JSON.stringify(Object.keys(config.databases))});` : ""}
     const headers = new Headers(incoming.headers);
     headers.delete("x-hibana-env"); headers.delete("x-hibana-event");
     const body = incoming.method === "GET" || incoming.method === "HEAD" ? undefined : await incoming.arrayBuffer();

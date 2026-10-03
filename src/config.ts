@@ -37,6 +37,8 @@ export async function loadConfig(file = "hibana.json") {
     "name",
     "main",
     "component",
+    "assets",
+    "databases",
     "build",
     "vars",
     "secrets",
@@ -47,10 +49,21 @@ export async function loadConfig(file = "hibana.json") {
   for (const key of Object.keys(value))
     if (!supported.has(key))
       throw new Error(`Unsupported hibana.json field: ${key}`);
-  if ((value.main !== undefined) === (value.component !== undefined))
-    throw new Error(
-      "Specify exactly one of main (JavaScript/TypeScript) or component (.wasm)",
-    );
+  if (["main", "component", "assets"].filter(key => value[key] !== undefined).length !== 1)
+    throw new Error("Specify exactly one of main (JavaScript/TypeScript), component (.wasm), or assets (static site)");
+  if (value.assets !== undefined) {
+    const assets = value.assets;
+    if (!assets || typeof assets !== "object" || Array.isArray(assets) || Object.keys(assets).some(key => key !== "directory"))
+      throw new Error("assets must contain only directory");
+    const directory = assets.directory;
+    if (typeof directory !== "string" || !directory.trim() || isAbsolute(directory) || /^[a-z]:/i.test(directory) ||
+        directory.includes("\\") || directory.includes("\0") || directory.split("/").some(part => part === "..") || resolve(dirname(path), directory) === dirname(path))
+      throw new Error("assets.directory must be a project-relative build output directory");
+    for (const key of ["vars", "secrets", "limits", "extensions", "dev", "databases"])
+      if (value[key] !== undefined) throw new Error(`Static sites cannot use runtime ${key}`);
+    validateBuild(value.build, directory);
+    return { ...value, root: dirname(path), path, resources: null };
+  }
   validateExtensionList(value.extensions);
   const input = value.main ?? value.component;
   if (typeof input !== "string" || !input.trim() || input.includes("\0"))
@@ -58,6 +71,7 @@ export async function loadConfig(file = "hibana.json") {
   validateBuild(value.build, value.component);
   const dev = devConfig(value.dev);
   const { vars, secrets } = validateEnvironment(value.vars, value.secrets);
+  const databases = validateDatabases(value.databases, vars, secrets);
   const limits = validateLimits(value.limits);
   const resources: Record<string, number> = {
     max_memory_bytes: limits.memory_mb * 1024 * 1024,
@@ -65,13 +79,13 @@ export async function loadConfig(file = "hibana.json") {
     max_execution_time_ms: limits.timeout_ms + 5000,
   };
   if (limits.fuel !== undefined) resources.max_fuel = limits.fuel;
-  return { ...value, vars, secrets, dev, root: dirname(path), path, resources };
+  return { ...value, vars, secrets, databases, dev, root: dirname(path), path, resources };
 }
 
 function validateBuild(build, component) {
   if (build === undefined) return;
   if (!component || !build || typeof build !== "object" || Array.isArray(build))
-    throw new Error("build requires a component path and an object");
+    throw new Error("build requires a component or assets path and an object");
   for (const key of Object.keys(build))
     if (!["commands", "watch"].includes(key))
       throw new Error(`Unsupported build field: ${key}`);
@@ -180,4 +194,16 @@ function validateLimits(input) {
   )
     throw new Error("fuel must be a positive safe integer");
   return limits;
+}
+
+export function validateDatabases(input, vars = {}, secrets: string[] = []) {
+  if (!vars || typeof vars !== "object" || Array.isArray(vars) || !Array.isArray(secrets))
+    throw new Error("vars must be an object and secrets must be an array");
+  const bindings = input === undefined ? {} : input;
+  if (!bindings || typeof bindings !== "object" || Array.isArray(bindings) || Object.keys(bindings).length > 8 ||
+    Object.entries(bindings).some(([name, id]) => !/^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(name) ||
+      ["__proto__", "prototype", "constructor"].includes(name) || typeof id !== "string" || !/^db_[a-f0-9]{32}$/.test(id) ||
+      Object.hasOwn(vars, name) || secrets.includes(name)))
+    throw new Error("Invalid or conflicting database bindings (maximum 8)");
+  return bindings as Record<string, string>;
 }

@@ -48,6 +48,19 @@ async function main() {
     console.log(helpText);
     return;
   }
+  if (values.cwd) process.chdir(values.cwd);
+  if (command === "whoami") {
+    const api = await apiClient(values);
+    const session = await api.request("/auth/session");
+    console.log(JSON.stringify({ url: api.url, ...session }, null, 2));
+    return;
+  }
+  if (command === "db") {
+    const { databaseCommand } = await import("./databases.js");
+    const result = await interruptible(signal => databaseCommand(args, values, signal));
+    if (result !== undefined) console.log(JSON.stringify(result, null, 2));
+    return;
+  }
   if (command === "runtime") {
     const { installRuntime } = await import("./runtime.js");
     return interruptible((signal) => installRuntime(values, { signal }));
@@ -108,6 +121,24 @@ async function main() {
   if (command === "dev") {
     const { dev } = await import("./dev.js");
     await dev(config, values, build);
+    return;
+  }
+  if (command === "deploy" && values.outdir && !values["dry-run"]) throw new Error("--outdir requires --dry-run");
+  if (command === "deploy" && values["dry-run"]) {
+    if (values.version) validateVersionName(values.version);
+    const artifact = await interruptible(signal => build(config, { signal, frozenLockfile: Boolean(values["frozen-lockfile"]) }));
+    if (artifact !== undefined) {
+      let output = artifact;
+      if (values.outdir) {
+        const { mkdir, copyFile } = await import("node:fs/promises");
+        const { resolve, join } = await import("node:path");
+        const directory = resolve(values.outdir);
+        await mkdir(directory, { recursive: true });
+        output = join(directory, config.name + (config.assets ? ".tar" : ".wasm"));
+        if (output !== artifact) await copyFile(artifact, output);
+      }
+      console.log(`Dry run complete: ${output}`);
+    }
     return;
   }
   const api = await apiClient(values);

@@ -1,0 +1,13 @@
+{
+  "name": "notes-api",
+  "main": "src/index.ts",
+  "databases": {
+    "DB": "db_00000000000000000000000000000000"
+  },
+  "vars": {
+    "FRONTEND_ORIGIN": "http://127.0.0.1:5173"
+  },
+  "secrets": [
+    "API_TOKEN"
+  ]
+}

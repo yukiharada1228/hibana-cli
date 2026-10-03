@@ -46,7 +46,7 @@ const options: Record<string, Option> = {
   "template": {
     "type": "string",
     "value": "NAME",
-    "description": "Hono application template (the only supported template)"
+    "description": "Application template: hono (default) or react (React + TypeScript + Vite)"
   },
   "no-install": {
     "type": "boolean",
@@ -127,6 +127,19 @@ const options: Record<string, Option> = {
     "description": "SHA-256 checksum; required with --from"
   }
 };
+Object.assign(options, {
+  cwd: { type: "string", value: "DIRECTORY", description: "Run in this working directory" },
+  command: { type: "string", value: "SQL", description: "SQL statements to execute" },
+  "migrations-dir": { type: "string", value: "DIRECTORY", description: "Migration directory relative to the config (default: migrations)" },
+  "persist-to": { type: "string", value: "DIRECTORY", description: "Directory for local SQLite data" },
+  outdir: { type: "string", value: "DIRECTORY", description: "Save the built artifact (with --dry-run)" },
+  local: { type: "boolean", description: "Use the project's local SQLite files" },
+  remote: { type: "boolean", description: "Use the database on the selected platform" },
+  file: { type: "string", value: "FILE", description: "UTF-8 SQL file" },
+  sql: { type: "string", value: "SQL", description: "One parameterized SQL statement" },
+  params: { type: "string", value: "JSON", description: "JSON array of SQL parameters" },
+  "read-only": { type: "boolean", description: "Grant only read access" },
+});
 const commands: Record<string, Command> = {
   "init": {
     "description": "Create a new application",
@@ -139,9 +152,10 @@ const commands: Record<string, Command> = {
     "min": 0,
     "max": 1,
     "examples": [
-      "hibana init my-api"
+      "hibana init my-api",
+      "hibana init my-web --template react"
     ],
-    "notes": "Creates a Hono application and installs its npm dependencies.\nThe project pins this CLI version in devDependencies.\nProject scripts use the local CLI; no global installation is needed.\nUse --cli-package PATH for a local CLI tarball.\nUse an empty directory; omit the directory to create files in the current one."
+    "notes": "Creates a Hono API or --template react SPA and installs npm dependencies.\nThe project pins this CLI version in devDependencies.\nProject scripts use the local CLI; no global installation is needed.\nUse --cli-package PATH for a local CLI tarball.\nUse an empty directory; omit the directory to create files in the current one."
   },
   "dev": {
     "description": "Run your application locally and reload changes",
@@ -159,10 +173,10 @@ const commands: Record<string, Command> = {
       "hibana dev",
       "hibana dev --port 3000"
     ],
-    "notes": "Open http://127.0.0.1:8787 (or your chosen port). Press Ctrl+C to stop.\nThe matching local runtime is installed automatically when needed and reused.\nFor a supplied executable, use --runtime PATH or HIBANA_RUNTIME_BIN.\nAllow local outbound connections with dev.allow_outbound in hibana.json (HOST:PORT).\nLocal Secrets belong in .dev.vars; deployment permissions and Secrets are separate."
+    "notes": "Open http://127.0.0.1:8787 (or your chosen port). Press Ctrl+C to stop.\nStatic sites preview built output without downloading a runtime; use Vite for React HMR.\nThe matching Wasm runtime is installed automatically when needed and reused.\nFor a supplied executable, use --runtime PATH or HIBANA_RUNTIME_BIN.\nAllow local outbound connections with dev.allow_outbound in hibana.json (HOST:PORT).\nLocal Secrets belong in .dev.vars; deployment permissions and Secrets are separate."
   },
   "build": {
-    "description": "Build a WebAssembly Component",
+    "description": "Build a WebAssembly Component or static site",
     "usage": "hibana build",
     "flags": [
       "config",
@@ -466,6 +480,35 @@ const commands: Record<string, Command> = {
   }
 };
 
+commands.db = {
+  description: "Manage application SQLite databases",
+  actions: {
+    list: { description: "List databases", usage: "hibana db list", flags: ["profile", "url"], min: 0, max: 0 },
+    create: { description: "Create a database (administrator)", usage: "hibana db create NAME", flags: ["profile", "url"], min: 1, max: 1 },
+    delete: { description: "Delete an unreferenced database (administrator)", usage: "hibana db delete ID", flags: ["profile", "url", "yes"], min: 1, max: 1 },
+    grant: { description: "Allow this application to use a binding (administrator)", usage: "hibana db grant BINDING", flags: ["config", "profile", "url", "read-only"], min: 1, max: 1 },
+    revoke: { description: "Revoke this application's binding (administrator)", usage: "hibana db revoke BINDING", flags: ["config", "profile", "url"], min: 1, max: 1 },
+    query: { description: "Execute one SQL statement", usage: "hibana db query BINDING", flags: ["config", "profile", "url", "local", "remote", "sql", "params", "runtime"], min: 1, max: 1, notes: "Choose exactly one of --local or --remote. Stop hibana dev before local SQL. Remote SQL requires administrator access." },
+    migrate: { description: "Apply a SQL migration atomically", usage: "hibana db migrate BINDING", flags: ["config", "profile", "url", "local", "remote", "file", "runtime"], min: 1, max: 1, notes: "Choose exactly one of --local or --remote and --file FILE. Stop hibana dev before local SQL. Applied filenames and checksums are retained. Remote migrations require administrator access." },
+  },
+};
+
+commands.init.flags!.push("yes");
+commands.dev.flags!.push("local", "persist-to");
+commands.deploy.flags!.push("dry-run", "outdir");
+commands.deploy.notes += "\n--dry-run builds and validates without authentication or contacting the server.";
+commands.whoami = { description: "Show the current authenticated account", usage: "hibana whoami", flags: ["profile", "url", "json"], min: 0, max: 0 };
+const databaseFlags = ["config", "profile", "url", "local", "remote", "runtime", "persist-to", "json"];
+commands.db.actions!.info = { description: "Show database information", usage: "hibana db info DATABASE", flags: ["config", "profile", "url", "json"], min: 1, max: 1 };
+commands.db.actions!.execute = { description: "Execute SQL text or a SQL file", usage: "hibana db execute DATABASE", flags: [...databaseFlags, "command", "file", "params", "yes"], min: 1, max: 1, examples: ["hibana db execute DB --local --command 'SELECT 1'", "hibana db execute DB --remote --file schema.sql"], notes: "Specify --command or --file and exactly one of --local / --remote. Each input runs atomically. Stop hibana dev before local SQL." };
+commands.db.actions!.migrations = { description: "Create, inspect and apply numbered SQL migrations", actions: {
+  create: { description: "Create the next numbered migration file", usage: "hibana db migrations create DATABASE NAME", flags: ["config", "migrations-dir"], min: 2, max: 2 },
+  list: { description: "Show pending and applied migrations and detect changed files", usage: "hibana db migrations list DATABASE", flags: [...databaseFlags, "migrations-dir"], min: 1, max: 1 },
+  apply: { description: "Apply pending migrations in filename order", usage: "hibana db migrations apply DATABASE", flags: [...databaseFlags, "migrations-dir", "yes"], min: 1, max: 1, examples: ["hibana db migrations apply DB --local", "hibana db migrations apply DB --remote"], notes: "Review pending migrations, then confirm. Use --yes in CI. Each file is atomic; earlier successful files stay applied if a later one fails." },
+}};
+for (const action of ["query", "migrate"]) commands.db.actions![action].flags!.push("persist-to", "json");
+for (const action of ["list", "create", "delete"]) commands.db.actions![action].flags!.push("json", "config");
+
 function rows(entries: string[][]) {
   const width = Math.max(...entries.map(([label]) => label.length));
   return entries
@@ -474,7 +517,7 @@ function rows(entries: string[][]) {
 }
 export function help(command?: string, action?: string) {
   if (!command)
-    return `Hibana — develop and deploy WebAssembly applications.
+    return `Hibana — develop and deploy APIs and static sites.
 
 Usage: hibana <command> [options]
 
@@ -487,7 +530,7 @@ Development:
 ${rows(["init", "dev", "build", "deploy"].map((name) => [name, commands[name].description]))}
 
 Applications and connections:
-${rows(["login", "logout", "list", "tail", "rollback", "delete", "secret", "egress", "profile"].map((name) => [name, commands[name].description]))}
+${rows(["login", "logout", "whoami", "list", "tail", "rollback", "delete", "secret", "db", "egress", "profile"].map((name) => [name, commands[name].description]))}
 
 Advanced:
 ${rows(["runtime"].map((name) => [name, commands[name].description]))}
@@ -495,11 +538,12 @@ ${rows(["runtime"].map((name) => [name, commands[name].description]))}
 Run hibana <command> --help for options and examples.
 Use --profile NAME on remote commands to select a saved connection.
 hibana --version shows the installed CLI version.`;
-  const parent = commands[command],
-    spec = action ? parent.actions![action] : parent;
+  let spec = commands[command];
+  for (const name of action?.split(" ") || []) spec = spec.actions![name];
+  const path = [command, action].filter(Boolean).join(" ");
   if (spec.actions)
-    return `${spec.description}\n\nUsage: hibana ${command} <command>\n\nCommands:\n${rows(Object.entries(spec.actions).map(([name, item]) => [name, item.description]))}\n\nRun hibana ${command} <command> --help for options and examples.`;
-  const flags = [...(spec.flags || []), "help"];
+    return `${spec.description}\n\nUsage: hibana ${path} <command>\n\nCommands:\n${rows(Object.entries(spec.actions).map(([name, item]) => [name, item.description]))}\n\nRun hibana ${path} <command> --help for options and examples.`;
+  const flags = [...(spec.flags || []), "cwd", "help"];
   return `${spec.description}\n\nUsage: ${spec.usage} [options]\n\nOptions:\n${rows(
     flags.map((name) => {
       const option = options[name];
@@ -570,20 +614,16 @@ export function parseCommand(argv: string[]): ParsedCommand {
         `Unknown command '${command}'.${suggestion(command, Object.keys(commands))}`,
       );
     context = command;
-    let spec = commands[command],
-      action;
-    if (spec.actions) {
-      [action] = args;
-      if (action) {
-        if (!Object.hasOwn(spec.actions, action))
-          throw new Error(
-            `Unknown ${command} command '${action}'.${suggestion(action, Object.keys(spec.actions))}`,
-          );
-        spec = spec.actions[action];
-        context += ` ${action}`;
-      }
+    let spec = commands[command], depth = 0;
+    while (spec.actions && args[depth]) {
+      const action = args[depth];
+      if (!Object.hasOwn(spec.actions, action))
+        throw new Error(`Unknown ${context} command '${action}'.${suggestion(action, Object.keys(spec.actions))}`);
+      spec = spec.actions[action];
+      context += ` ${action}`;
+      depth++;
     }
-    const allowed = new Set([...(spec.flags || []), "help"]);
+    const allowed = new Set([...(spec.flags || []), "cwd", "help"]);
     for (const [name, value] of Object.entries(values)) {
       if (!allowed.has(name))
         throw new Error(
@@ -594,8 +634,8 @@ export function parseCommand(argv: string[]): ParsedCommand {
           `Option '--${name}' requires a non-empty ${options[name].value}.`,
         );
     }
-    if (values.help || spec.actions) return { helpText: help(command, action) };
-    const positional = action ? args.slice(1) : args;
+    if (values.help || spec.actions) return { helpText: help(command, args.slice(0, depth).join(" ") || undefined) };
+    const positional = args.slice(depth);
     if (positional.length < (spec.min ?? 0) || positional.length > (spec.max ?? 0))
       throw new Error(`Usage: ${spec.usage} [options]`);
     if (spec.secretName && !/^[A-Z_][A-Z0-9_]{0,63}$/.test(positional[0]))
