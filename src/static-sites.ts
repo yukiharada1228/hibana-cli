@@ -172,7 +172,8 @@ export async function devStatic(config, options) {
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("port must be 1..65535");
   const controller = new AbortController();
   let server: ReturnType<typeof createServer> | undefined, watcher, timer, reload: Promise<void> | undefined;
-  let handler, closed = false, dirty = false, initialized = false;
+  let handler, closed = false, dirty = false, initialized = false, rewatch = false;
+  let subscribe: (() => void) | undefined;
   let finish!: () => void;
   const done = new Promise<void>(resolve => { finish = resolve; });
   function stop() {
@@ -183,6 +184,9 @@ export async function devStatic(config, options) {
     do {
       dirty = false;
       try {
+        // Recursive fs.watch can retain the removed directory inode on Linux.
+        // Reattach before snapshotting so later edits of the replacement are seen.
+        if (rewatch) { rewatch = false; subscribe!(); }
         const { files } = await snapshot(config, controller.signal);
         packAssets(files); // Validate the same aggregate limit as deployment.
         if (!closed) handler = staticHandler(files);
@@ -198,16 +202,23 @@ export async function devStatic(config, options) {
       // Subscribe before the first served snapshot: output can change while
       // the snapshot or HTTP listener is starting. Watch parents for renames.
       const directory = resolve(root, config.assets.directory);
-      watcher = watch(root, { recursive: true }, (_, file) => {
-        const changed = file ? resolve(root, String(file)) : root;
-        if (!isInside(directory, changed) && !isInside(changed, directory)) return;
-        if (!initialized || reload) { dirty = true; return; }
-        clearTimeout(timer);
-        timer = setTimeout(() => {
-          reload = refresh().finally(() => { reload = undefined; });
-        }, 150);
-      });
-      watcher.on("error", error => { console.error(error.message); process.exitCode = 1; stop(); });
+      subscribe = () => {
+        const next = watch(root, { recursive: true }, (event, file) => {
+          if (closed) return;
+          const changed = file ? resolve(root, String(file)) : root;
+          if (!isInside(directory, changed) && !isInside(changed, directory)) return;
+          if (event === "rename") rewatch = true;
+          if (!initialized || reload) { dirty = true; return; }
+          clearTimeout(timer);
+          timer = setTimeout(() => {
+            reload = refresh().finally(() => { reload = undefined; });
+          }, 150);
+        });
+        next.on("error", error => { console.error(error.message); process.exitCode = 1; stop(); });
+        watcher?.close();
+        watcher = next;
+      };
+      subscribe();
     }
     const current = await snapshot(config, controller.signal);
     packAssets(current.files);

@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer, request } from "node:http";
 import { spawn } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { list } from "tar";
 import { init } from "../dist/init.js";
 import { build } from "../dist/build.js";
@@ -219,7 +219,7 @@ for (const { phase, watch } of [{ phase: "watch registration", watch: true }, { 
     const port = reserve.address().port;
     await new Promise(resolve => reserve.close(resolve));
     const cli = fileURLToPath(new URL("../dist/cli.js", import.meta.url));
-    const child = spawn(process.execPath, ["--import", preload, cli, "dev", "--port", String(port), ...(!watch ? ["--no-watch"] : [])], { cwd: config.root, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(process.execPath, ["--import", pathToFileURL(preload).href, cli, "dev", "--port", String(port), ...(!watch ? ["--no-watch"] : [])], { cwd: config.root, stdio: ["ignore", "pipe", "pipe"] });
     const exited = new Promise(resolve => child.once("exit", resolve));
     t.after(async () => { child.kill("SIGKILL"); await exited; });
     let output = "";
