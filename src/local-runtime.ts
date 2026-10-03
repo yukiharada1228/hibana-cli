@@ -16,10 +16,11 @@ export async function localRuntime(options, signal?: AbortSignal) {
   return installRuntime({}, { signal, log: console.error });
 }
 
-export async function requireManagedSql(runtime: string, signal?: AbortSignal) {
+export async function requireManagedSql(runtime: string, signal?: AbortSignal, admin = false) {
   try {
     const result = await run(runtime, ["--capabilities"], { capture: true, signal, timeout: 10000 }) as { stdout: string };
-    if (JSON.parse(result.stdout).managed_sql === 1) return;
+    const capabilities = JSON.parse(result.stdout);
+    if (capabilities.managed_sql === 1 && (!admin || capabilities.managed_sql_admin === 1)) return;
   } catch (error) { if (signal?.aborted) throw error; }
-  throw new Error("This local runtime does not support managed SQLite. Install a compatible runtime or set HIBANA_RUNTIME_BIN / --runtime to the updated hibana-worker.");
+  throw new Error("This local runtime does not support the requested managed SQLite operation. Install a compatible runtime or set HIBANA_RUNTIME_BIN / --runtime to the updated hibana-worker.");
 }

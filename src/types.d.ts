@@ -17,6 +17,6 @@ export interface ExtensionPlan {
 export interface ProcessOptions extends SpawnOptions {
   input?: string; stopTimeoutMs?: number; capture?: boolean; maxBuffer?: number; timeout?: number;
 }
-export interface RequestOptions { method?: string; body?: any; auth?: boolean; signal?: AbortSignal }
+export interface RequestOptions { stream?: boolean; method?: string; body?: any; auth?: boolean; signal?: AbortSignal }
 export interface BrowserOptions { noBrowser?: boolean; open?: (url: string) => Promise<void>; timeoutMs?: number; signal?: AbortSignal; log?: (message: string) => void }
 export interface RuntimeOptions { fetcher?: typeof fetch; home?: string; target?: string; signal?: AbortSignal; log?: (message: string) => void }
