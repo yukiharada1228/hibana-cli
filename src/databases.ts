@@ -53,7 +53,7 @@ export function validateQuery(query) {
   return query;
 }
 
-async function databaseContext(target, options, signal?: AbortSignal) {
+export async function databaseContext(target, options, signal?: AbortSignal) {
   const configPath = resolve(options.config || "hibana.json"), root = dirname(configPath);
   let config;
   try { config = await readConfigFile(configPath); }
@@ -73,18 +73,18 @@ async function databaseContext(target, options, signal?: AbortSignal) {
   if (!id) throw new Error("Binding is missing from hibana.json databases; use a binding, database ID or remote database name");
   return { id, root, config };
 }
-function selectTarget(options) {
+export function selectTarget(options) {
   if (Boolean(options.local) === Boolean(options.remote)) throw new Error("Choose exactly one of --local or --remote");
   if (options.local && (options.profile || options.url)) throw new Error("Local SQL does not accept a remote profile or URL");
   if (options.remote && (options.runtime || options["persist-to"])) throw new Error("--runtime and --persist-to are only used with --local");
 }
-async function localOperation(context, options, operation, signal?: AbortSignal) {
+export async function localOperation(context, options, operation, signal?: AbortSignal) {
   const runtime = await localRuntime(options, signal);
-  await requireManagedSql(runtime, signal);
+  await requireManagedSql(runtime, signal, Boolean(operation.import || operation.export || operation.schema));
   const directory = resolve(options["persist-to"] || join(context.root, ".hibana/databases"));
   const input = JSON.stringify({ directory, id: context.id, ...operation });
   try {
-    const result = await run(runtime, ["--dev-sql"], { input, capture: true, signal, timeout: 15000 }) as { stdout: string; stderr: string };
+    const result = await run(runtime, ["--dev-sql"], { input, capture: true, signal, timeout: operation.import || operation.export ? 120000 : 15000 }) as { stdout: string; stderr: string };
     return JSON.parse(result.stdout);
   } catch (error) {
     if (signal?.aborted) throw error;
@@ -178,7 +178,16 @@ async function migrations(args, options, signal?: AbortSignal) {
 export async function databaseCommand(args, options, signal?: AbortSignal) {
   const [action, target] = args;
   if (action === "migrations") return migrations(args.slice(1), options, signal);
+  if (action === "export" || (action === "execute" && options.file)) {
+    const transfer = await import("./database-transfer.js");
+    return action === "export" ? transfer.exportSql(target, options, signal) : transfer.importSql(target, options, signal);
+  }
+  if (action === "time-travel" || action === "insights") {
+    const admin = await import("./database-admin.js");
+    return action === "time-travel" ? admin.timeTravel(args.slice(1), options, signal) : admin.insights(target, options, signal);
+  }
   if (action === "create" && !validName(target)) throw new Error("Invalid database name (1..128 letters, digits, _, - or .)");
+  if (action === "create") return (await import("./database-create.js")).createDatabase(target, options, signal);
   if (["list", "create", "delete", "info"].includes(action)) {
     if (["delete", "info"].includes(action) && !validName(target)) throw new Error("Expected a database name, binding or ID");
     // Preserve cancellation before any request when the caller already has an ID.
@@ -193,7 +202,11 @@ export async function databaseCommand(args, options, signal?: AbortSignal) {
       const requestedId = binding || (validId(target) ? target : undefined);
       const row = result.databases?.find(row => row.status !== "deleted" && (requestedId ? row.id === requestedId : row.name === target));
       if (!row) throw new Error("Database not found");
-      if (action === "info") return row;
+      if (action === "info") {
+        if (!validId(row.id)) throw new Error("Invalid database ID response");
+        try { return { ...row, schema: await api.request(`/databases/${row.id}/schema`, { signal }) }; }
+        catch (error) { if (error instanceof ApiError && error.status === 403) return { ...row, schema_access: "Administrator access required" }; throw error; }
+      }
       id = row.id;
       if (!validId(id)) throw new Error("Invalid database ID response");
       if (!validId(target) && !await confirm(`Delete database ${text(row.name)} (${id})?`, Boolean(options.yes), signal)) return;

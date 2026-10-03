@@ -22,7 +22,7 @@ export async function apiClient(options: CliOptions = {}) {
   let token = savedToken;
   async function request(
     path,
-    { method = "GET", body, auth = true, signal }: RequestOptions = {},
+    { method = "GET", body, auth = true, signal, stream = false }: RequestOptions = {},
   ) {
     if (auth && !token)
       throw new Error("Run hibana login, or set HIBANA_TOKEN");
@@ -57,6 +57,7 @@ export async function apiClient(options: CliOptions = {}) {
       throw error;
     }
     if (response.status === 204) return;
+    if (stream) return response;
     try {
       return await response.json();
     } catch (cause) {

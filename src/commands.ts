@@ -128,6 +128,20 @@ const options: Record<string, Option> = {
   }
 };
 Object.assign(options, {
+  binding: { type: "string", value: "NAME", description: "Binding name for the created database (default: DB)" },
+  "update-config": { type: "boolean", description: "Add the binding to the existing hibana.json without replacing bindings" },
+  output: { type: "string", value: "FILE", description: "Save the SQL dump to a new file (never overwrites)" },
+  table: { type: "string", value: "TABLE", description: "Export only this table and its indexes/triggers" },
+  "no-schema": { type: "boolean", description: "Export data only" },
+  "no-data": { type: "boolean", description: "Export schema only" },
+  timestamp: { type: "string", value: "TIMESTAMP", description: "Unix seconds or RFC3339 (within 24 hours)" },
+  bookmark: { type: "string", value: "BOOKMARK", description: "A verified Hibana recovery bookmark" },
+  "no-wait": { type: "boolean", description: "Return once recovery is accepted; it continues in the background" },
+  "time-period": { type: "string", value: "PERIOD", description: "1h, 6h, 1d, 24h or 7d (default: 1d)" },
+  "sort-by": { type: "string", value: "FIELD", description: "time, count, errors, rows_returned or rows_written" },
+  "sort-type": { type: "string", value: "OPERATION", description: "sum (default), avg or max (time only)" },
+  "sort-direction": { type: "string", value: "DIRECTION", description: "ASC or DESC (default: DESC)" },
+  limit: { type: "string", value: "COUNT", description: "Maximum insight groups, 1..100 (default: 5)" },
   cwd: { type: "string", value: "DIRECTORY", description: "Run in this working directory" },
   command: { type: "string", value: "SQL", description: "SQL statements to execute" },
   "migrations-dir": { type: "string", value: "DIRECTORY", description: "Migration directory relative to the config (default: migrations)" },
@@ -499,13 +513,21 @@ commands.deploy.flags!.push("dry-run", "outdir");
 commands.deploy.notes += "\n--dry-run builds and validates without authentication or contacting the server.";
 commands.whoami = { description: "Show the current authenticated account", usage: "hibana whoami", flags: ["profile", "url", "json"], min: 0, max: 0 };
 const databaseFlags = ["config", "profile", "url", "local", "remote", "runtime", "persist-to", "json"];
+commands.db.actions!.export = { description: "Export a consistent SQL snapshot", usage: "hibana db export DATABASE", flags: [...databaseFlags,"output","table","no-schema","no-data"], min: 1, max: 1, notes: "Choose --local or --remote and --output FILE. Up to 600 MiB of SQL; internal identity and migration tables are excluded. Existing output files are never overwritten." };
+commands.db.actions!.create.flags!.push("binding", "update-config");
 commands.db.actions!.info = { description: "Show database information", usage: "hibana db info DATABASE", flags: ["config", "profile", "url", "json"], min: 1, max: 1 };
-commands.db.actions!.execute = { description: "Execute SQL text or a SQL file", usage: "hibana db execute DATABASE", flags: [...databaseFlags, "command", "file", "params", "yes"], min: 1, max: 1, examples: ["hibana db execute DB --local --command 'SELECT 1'", "hibana db execute DB --remote --file schema.sql"], notes: "Specify --command or --file and exactly one of --local / --remote. Each input runs atomically. Stop hibana dev before local SQL." };
+commands.db.actions!.execute = { description: "Execute SQL text or a SQL file", usage: "hibana db execute DATABASE", flags: [...databaseFlags, "command", "file", "params", "yes"], min: 1, max: 1, examples: ["hibana db execute DB --local --command 'SELECT 1'", "hibana db execute DB --remote --file schema.sql"], notes: "Specify --command or --file and exactly one of --local / --remote. Each input runs atomically. Files support up to 600 MiB / 40 seconds and require confirmation (--yes in CI). Stop hibana dev before local SQL." };
 commands.db.actions!.migrations = { description: "Create, inspect and apply numbered SQL migrations", actions: {
   create: { description: "Create the next numbered migration file", usage: "hibana db migrations create DATABASE NAME", flags: ["config", "migrations-dir"], min: 2, max: 2 },
   list: { description: "Show pending and applied migrations and detect changed files", usage: "hibana db migrations list DATABASE", flags: [...databaseFlags, "migrations-dir"], min: 1, max: 1 },
   apply: { description: "Apply pending migrations in filename order", usage: "hibana db migrations apply DATABASE", flags: [...databaseFlags, "migrations-dir", "yes"], min: 1, max: 1, examples: ["hibana db migrations apply DB --local", "hibana db migrations apply DB --remote"], notes: "Review pending migrations, then confirm. Use --yes in CI. Each file is atomic; earlier successful files stay applied if a later one fails." },
 }};
+const remoteDatabaseFlags = ["config", "profile", "url", "json"];
+commands.db.actions!["time-travel"] = { description: "Inspect recovery points and restore a remote database", actions: {
+  info: { description: "Show a verified backup point and recovery history", usage: "hibana db time-travel info DATABASE", flags: [...remoteDatabaseFlags,"timestamp","bookmark"], min: 1, max: 1, notes: "Defaults to the latest backup. Backups cover up to 24 hours; actual boundaries depend on retained replication files." },
+  restore: { description: "Restore from a verified retained backup", usage: "hibana db time-travel restore DATABASE", flags: [...remoteDatabaseFlags,"timestamp","bookmark","yes","no-wait"], min: 1, max: 1, notes: "Choose --timestamp or --bookmark. SQL pauses during recovery. Newer writes are lost when the verified generation is activated. Requires confirmation (--yes for CI)." },
+}};
+commands.db.actions!.insights = { description: "Analyze remote query performance without storing parameter values", usage: "hibana db insights DATABASE", flags: [...remoteDatabaseFlags,"time-period","sort-by","sort-type","sort-direction","limit"], min: 1, max: 1, notes: "Hourly aggregates retained for 7 days. Rows returned/written are measured; scanned rows are not measured. Failed atomic batches count as one failed sample." };
 for (const action of ["query", "migrate"]) commands.db.actions![action].flags!.push("persist-to", "json");
 for (const action of ["list", "create", "delete"]) commands.db.actions![action].flags!.push("json", "config");
 
