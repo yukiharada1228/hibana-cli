@@ -36,6 +36,17 @@ test('remote recovery resolves a verified point and submits exactly one confirme
   const result=await databaseCommand(['time-travel','restore','DB'],{...f.options,bookmark,yes:true,'no-wait':true});
   assert.equal(result.id,job);assert.equal(calls.filter(c=>c[1]==='POST').length,1);
 });
+test('recovery timestamps reject impossible calendar dates and end-of-day normalization',t=>{
+  let now=Date.parse('2026-03-01T12:00:00Z');
+  t.mock.method(Date,'now',()=>now);
+  for(const timestamp of ['2026-02-29T10:00:00Z','2026-02-29T19:00:00+09:00','2026-02-28T24:00:00Z']) {
+    assert.throws(()=>recoveryParameters({timestamp}),/valid.*RFC3339/);
+  }
+  assert.equal(recoveryParameters({timestamp:'2026-03-01T19:00:00+09:00'}).get('timestamp'),'2026-03-01T10:00:00.000Z');
+  assert.equal(recoveryParameters({timestamp:String((now-1000)/1000)}).get('timestamp'),'2026-03-01T11:59:59.000Z');
+  now=Date.parse('2028-03-01T00:00:00Z');
+  assert.equal(recoveryParameters({timestamp:'2028-02-29T23:59:59Z'}).get('timestamp'),'2028-02-29T23:59:59.000Z');
+});
 test('streamed SQL exports never overwrite or publish partial downloads',async t=>{
   const f=await fixture(t),output=join(f.root,'dump.sql'),sql='SELECT 1;\n';let declared=sql.length+2,calls=0;
   t.mock.method(globalThis,'fetch',async()=>{calls++;return new Response(sql,{headers:{'content-type':'application/sql','content-length':String(declared)}});});
