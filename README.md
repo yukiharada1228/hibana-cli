@@ -290,3 +290,7 @@ native SQLite migration/rollback tests in `npm test`.
 
 [MIT](LICENSE). Bundled dependencies have their own licenses; see
 [third-party notices](THIRD_PARTY_LICENSES.txt).
+
+### Database result helpers
+
+The database binding supports `prepare().bind().all()`, `run()`, `first()`, `raw()` and atomic `batch()`. `raw({ columnNames: true })` includes a header row and preserves SQL column order, duplicate names and BLOB byte arrays. `exec(sql)` accepts one statement per line (up to 32), returns `{ count, duration }`, and rolls back the entire call on failure. These two helpers require a Hibana server/local runtime that supports the `result_format` SQL protocol; older runtimes reject the request. They do not add D1 Sessions or read replication.

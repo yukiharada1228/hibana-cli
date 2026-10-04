@@ -57,3 +57,51 @@ test("invalid types, binding names and cross-database batches are rejected", asy
     Response.json({ error: "access denied" }, { status: 403 });
   await assert.rejects(db.prepare("SELECT 1").all(), /access denied/);
 });
+
+test("raw preserves projection order, duplicate names and empty headers; exec discards rows", async () => {
+  const db = new Database("DB");
+  const requests = [];
+  globalThis.fetch = async (_, options) => {
+    const request = JSON.parse(options.body);
+    requests.push(request);
+    return Response.json({
+      results: request.statements.map((s) => ({
+        success: true,
+        results: [],
+        columns: s.sql.includes("empty") ? ["empty"] : ["z", "a", "a", "blob"],
+        ...(request.result_format === "rows"
+          ? { rows: s.sql.includes("empty") ? [] : [[2, 1, 3, [0, 255]]] }
+          : {}),
+        meta: { duration: 1.5 },
+      })),
+    });
+  };
+  assert.deepEqual(
+    await db
+      .prepare("SELECT ?, 1, 3, X'00ff'")
+      .bind(2)
+      .raw({ columnNames: true }),
+    [
+      ["z", "a", "a", "blob"],
+      [2, 1, 3, [0, 255]],
+    ],
+  );
+  assert.deepEqual(requests[0].statements[0].params, [2]);
+  assert.deepEqual(
+    await db.prepare("SELECT empty WHERE 0").raw({ columnNames: true }),
+    [["empty"]],
+  );
+  assert.deepEqual(await db.prepare("SELECT empty WHERE 0").raw(), []);
+  assert.deepEqual(
+    await db.exec("CREATE TABLE t(id);\r\nINSERT INTO t VALUES(1);"),
+    { count: 2, duration: 3 },
+  );
+  assert.equal(requests.at(-1).result_format, "none");
+  assert.equal(requests.at(-1).statements.length, 2);
+  await assert.rejects(db.exec("SELECT 1\n".repeat(33)), /1..32/);
+  globalThis.fetch = async () =>
+    Response.json({ results: [{ success: true, results: [], meta: {} }] });
+  await assert.rejects(db.prepare("SELECT 1").raw(), /updated Hibana runtime/);
+  globalThis.fetch = async () => Response.json({ results: [] });
+  await assert.rejects(db.exec("SELECT 1"), /Invalid query response/);
+});
