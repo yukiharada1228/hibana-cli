@@ -21,7 +21,7 @@ automatically on first use. Project settings live in `hibana.json`.
 
 ## React SPA
 
-React SPA and managed SQLite workflows are available in CLI `0.4.0-rc.5`.
+React SPA and managed SQLite workflows are available in CLI `0.4.0-rc.5` and later.
 
 ```sh
 hibana init my-web --template react
@@ -117,7 +117,7 @@ independent data. Stop `hibana dev` before running local SQL. SQL execution and 
 require exactly one of `--local` or `--remote`; remote SQL requires administrator
 access and accepts `--profile NAME`.
 
-The CLI automatically installs its matching Worker (0.3.0-rc.9), including local
+The CLI automatically installs its matching Worker, including local
 SQLite support. Custom workers selected with `HIBANA_RUNTIME_BIN` or `--runtime`
 must report `managed_sql: 1` from `--capabilities`; older workers are rejected
 with an update hint.
