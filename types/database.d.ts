@@ -27,10 +27,20 @@ export interface DatabaseStatement {
   first<T = unknown>(column: string): Promise<T | null>;
 }
 export interface Database {
+  /** Creates a session whose queries observe at least the preceding query's state. */
+  withSession(constraint?: "first-primary" | "first-unconstrained" | string): DatabaseSession;
   prepare(sql: string): DatabaseStatement;
   /** One SQL statement per line; the entire call is atomic (up to 32 statements). */
   exec(sql: string): Promise<{ count: number; duration: number }>;
   batch<T = Record<string, unknown>>(
     statements: DatabaseStatement[],
   ): Promise<DatabaseResult<T>[]>;
+}
+export interface DatabaseSession {
+  prepare(sql: string): DatabaseStatement;
+  batch<T = Record<string, unknown>>(
+    statements: DatabaseStatement[],
+  ): Promise<DatabaseResult<T>[]>;
+  /** The opaque bookmark of the last completed query, or null before a query. */
+  getBookmark(): string | null;
 }
