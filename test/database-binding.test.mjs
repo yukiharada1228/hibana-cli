@@ -2,6 +2,67 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { Database, installDatabases } from "../assets/database.mjs";
 
+test("sessions serialize concurrent batches, carry bookmarks and capture queued parameters", async () => {
+  const db = new Database("DB");
+  const session = db.withSession("first-primary");
+  const seen = [];
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  globalThis.fetch = async (_, options) => {
+    const body = JSON.parse(options.body);
+    seen.push(body);
+    if (seen.length === 1) await gate;
+    return Response.json({ bookmark: `hbs1.c${seen.length}.c2ln`, results: body.statements.map(() => ({
+      success: true, results: [{ n: seen.length }], meta: {}, columns: ["n"], rows: [[seen.length]],
+    })) });
+  };
+  assert.equal(session.getBookmark(), null);
+  const first = session.prepare("SELECT 1 AS n").first("n");
+  const statement = session.prepare("SELECT ? AS n").bind(2);
+  const batch = [statement];
+  const second = session.batch(batch);
+  statement.params[0] = 99;
+  batch.push(session.prepare("SELECT 3"));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(seen.length, 1);
+  assert.equal(seen[0].session, "first-primary");
+  release();
+  assert.equal(await first, 1);
+  assert.equal((await second)[0].results[0].n, 2);
+  assert.equal(seen[1].session, "hbs1.c1.c2ln");
+  assert.deepEqual(seen[1].statements[0].params, [2]);
+  assert.equal(seen[1].statements.length, 1);
+  assert.equal(session.getBookmark(), "hbs1.c2.c2ln");
+  const next = db.withSession(session.getBookmark());
+  assert.equal(next.getBookmark(), null);
+  await next.prepare("SELECT 3").raw();
+  assert.equal(seen[2].session, "hbs1.c2.c2ln");
+  const unconstrained = db.withSession();
+  await unconstrained.prepare("SELECT 4").run();
+  assert.equal(seen[3].session, "first-unconstrained");
+  await assert.rejects(session.batch([next.prepare("SELECT 1")]));
+  assert.equal(session.exec, undefined);
+});
+
+test("failed session transport never retries or allows queued work with an old bookmark", async () => {
+  const session = new Database("DB").withSession();
+  let calls = 0;
+  globalThis.fetch = async () => { calls++; throw new Error("response lost after commit"); };
+  const settled = await Promise.allSettled([
+    session.prepare("UPDATE t SET n=n+1").run(), session.prepare("SELECT n FROM t").all(),
+  ]);
+  assert.ok(settled.every((r) => r.status === "rejected"));
+  assert.equal(calls, 1);
+  assert.equal(session.getBookmark(), null);
+  await assert.rejects(session.prepare("SELECT 1").all(), /first-primary/);
+  assert.equal(calls, 1);
+  const invalid = new Database("DB").withSession();
+  globalThis.fetch = async () => Response.json({results:[{success:true,results:[],meta:{}}]});
+  await assert.rejects(invalid.prepare("SELECT 1").all(), /bookmark/);
+  for (const value of [null, "", "a\nb", "x".repeat(2049), 3])
+    assert.throws(() => new Database("DB").withSession(value));
+});
+
 test("immutable parameters, result helpers, atomic batch transport and no credentials", async () => {
   const requests = [];
   globalThis.fetch = async (url, options) => {
@@ -56,4 +117,52 @@ test("invalid types, binding names and cross-database batches are rejected", asy
   globalThis.fetch = async () =>
     Response.json({ error: "access denied" }, { status: 403 });
   await assert.rejects(db.prepare("SELECT 1").all(), /access denied/);
+});
+
+test("raw preserves projection order, duplicate names and empty headers; exec discards rows", async () => {
+  const db = new Database("DB");
+  const requests = [];
+  globalThis.fetch = async (_, options) => {
+    const request = JSON.parse(options.body);
+    requests.push(request);
+    return Response.json({
+      results: request.statements.map((s) => ({
+        success: true,
+        results: [],
+        columns: s.sql.includes("empty") ? ["empty"] : ["z", "a", "a", "blob"],
+        ...(request.result_format === "rows"
+          ? { rows: s.sql.includes("empty") ? [] : [[2, 1, 3, [0, 255]]] }
+          : {}),
+        meta: { duration: 1.5 },
+      })),
+    });
+  };
+  assert.deepEqual(
+    await db
+      .prepare("SELECT ?, 1, 3, X'00ff'")
+      .bind(2)
+      .raw({ columnNames: true }),
+    [
+      ["z", "a", "a", "blob"],
+      [2, 1, 3, [0, 255]],
+    ],
+  );
+  assert.deepEqual(requests[0].statements[0].params, [2]);
+  assert.deepEqual(
+    await db.prepare("SELECT empty WHERE 0").raw({ columnNames: true }),
+    [["empty"]],
+  );
+  assert.deepEqual(await db.prepare("SELECT empty WHERE 0").raw(), []);
+  assert.deepEqual(
+    await db.exec("CREATE TABLE t(id);\r\nINSERT INTO t VALUES(1);"),
+    { count: 2, duration: 3 },
+  );
+  assert.equal(requests.at(-1).result_format, "none");
+  assert.equal(requests.at(-1).statements.length, 2);
+  await assert.rejects(db.exec("SELECT 1\n".repeat(33)), /1..32/);
+  globalThis.fetch = async () =>
+    Response.json({ results: [{ success: true, results: [], meta: {} }] });
+  await assert.rejects(db.prepare("SELECT 1").raw(), /updated Hibana runtime/);
+  globalThis.fetch = async () => Response.json({ results: [] });
+  await assert.rejects(db.exec("SELECT 1"), /Invalid query response/);
 });

@@ -18,4 +18,4 @@ export function releaseBase(version) {
 }
 
 // Runtime compatibility is independent of the CLI package version.
-export const RUNTIME_VERSION = "0.3.0-rc.9";
+export const RUNTIME_VERSION = "0.3.0-rc.10";

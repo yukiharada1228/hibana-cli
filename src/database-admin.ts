@@ -27,9 +27,19 @@ export function recoveryParameters(options, restoring = false) {
   if (options.timestamp) {
     const value = String(options.timestamp);
     const unix = /^\d+(\.\d+)?$/.test(value);
-    if (!unix && !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?(?:Z|[+-]\d\d:\d\d)$/.test(value)) throw new Error("--timestamp must be Unix seconds or RFC3339 with a timezone");
+    if (!unix) {
+      const parts = /^(\d{4})-(\d\d)-(\d\d)T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/.exec(value);
+      if (!parts) throw new Error("--timestamp must be Unix seconds or valid RFC3339 with a timezone");
+      const [year, month, day] = parts.slice(1, 4).map(Number);
+      const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+      const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      // Date normalizes e.g. February 29 in a non-leap year to March 1.
+      // Reject that input before choosing a recovery point at a different instant.
+      if (month < 1 || month > 12 || day < 1 || day > days[month - 1]) throw new Error("--timestamp must be a valid calendar date in RFC3339");
+    }
     const date = new Date(unix ? Number(value) * 1000 : value);
-    if (!Number.isFinite(date.valueOf()) || date.valueOf() > Date.now() || date.valueOf() < Date.now()-24*3600*1000) throw new Error("--timestamp must be within the past 24 hours");
+    const now = Date.now();
+    if (!Number.isFinite(date.valueOf()) || date.valueOf() > now || date.valueOf() < now-24*3600*1000) throw new Error("--timestamp must be within the past 24 hours");
     params.set("timestamp", date.toISOString());
   }
   return params;

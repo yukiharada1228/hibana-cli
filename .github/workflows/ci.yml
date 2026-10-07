@@ -7,6 +7,9 @@ on:
   workflow_call:
 permissions:
   contents: read
+concurrency:
+  group: cli-ci-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   test:
     strategy:
@@ -22,7 +25,7 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
-      - run: npm run check
+      # npm test builds with tsc (including type checks) before running the suite.
       - run: npm test
       - name: Install tarball and build Hono with Node crypto
         run: npm run test:package

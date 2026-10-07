@@ -290,3 +290,17 @@ native SQLite migration/rollback tests in `npm test`.
 
 [MIT](LICENSE). Bundled dependencies have their own licenses; see
 [third-party notices](THIRD_PARTY_LICENSES.txt).
+
+### Database result helpers
+
+The database binding supports `prepare().bind().all()`, `run()`, `first()`, `raw()` and atomic `batch()`. `raw({ columnNames: true })` includes a header row and preserves SQL column order, duplicate names and BLOB byte arrays. `exec(sql)` accepts one statement per line (up to 32), returns `{ count, duration }`, and rolls back the entire call on failure. These two helpers require a Hibana server/local runtime that supports the `result_format` SQL protocol; older runtimes reject the request.
+
+On a deployed application, `withSession("first-primary")` starts with a primary query. `withSession()` allows the first query to use an eligible read replica when replication is enabled for the database. Queries within the session run in order; use `getBookmark()` after a successful query to continue the session in another request:
+
+```ts
+const session = env.DB.withSession(bookmark ?? "first-primary");
+const rows = await session.prepare("SELECT * FROM notes ORDER BY id").all();
+return Response.json({ rows: rows.results, bookmark: session.getBookmark() });
+```
+
+Session bookmarks are opaque Hibana tokens, distinct from Time Travel recovery bookmarks and incompatible with Cloudflare D1 bookmarks. A session stops after a query fails, including an ambiguous response after a write; start a new `first-primary` session and check the outcome before retrying a write. Sessions require the updated remote Hibana service and are not supported by the local SQLite runtime. Local `prepare`, `batch`, `raw` and `exec` remain available.
