@@ -123,6 +123,14 @@ export async function iamCommand(args: string[], options: CliOptions = {}, signa
   const [group, operation, target] = args;
   if (group === "login") return login(options, signal);
   const api = await apiClient(options);
+  if (group === "session") return api.request("/auth/session", { signal });
+  if (group === "audit" && operation === "list") return list(api, "/iam/audit", signal);
+  if (group === "assume-role") {
+    if (process.env.HIBANA_TOKEN?.trim()) throw new Error("Unset HIBANA_TOKEN before switching roles so subsequent commands use the new session");
+    const roleId = id(option(options, "role"));
+    await api.loginOidc({ roleId, switchRole: true, noBrowser: Boolean(options["no-browser"]), signal });
+    return api.request("/auth/session", { signal });
+  }
   if (group === "member") {
     if (operation === "list") return list(api, "/users", signal);
     if (operation === "invite") {

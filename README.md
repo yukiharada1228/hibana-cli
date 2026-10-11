@@ -353,6 +353,16 @@ A member can have up to four roles; a role can contain up to four policies.
 to existing sessions. The last active human Administrator is protected against
 removal. Policies and roles managed by Hibana cannot be edited or deleted.
 
+On servers supporting role sessions, a human session uses one assigned role.
+`hibana iam session` shows the current role, available roles and expiry;
+`hibana iam assume-role --role rol_ID` switches through browser authentication.
+Use `hibana login --role rol_ID` to start a new session directly. Administrative
+roles require fresh MFA and expire within 15 minutes of that authentication.
+Switching successfully revokes the previous session. A normal login selects a
+unique non-administrative role, or asks you to choose one if there is no safe
+default. `hibana iam audit list` shows the account's access-management events
+when the active role permits `iam:Read`.
+
 Policies use `*`, a service wildcard such as `application:*`, or complete resource
 IDs / account-bound resource wildcards such as
 `hibana:ten_ACCOUNT:database/*`. Partial wildcards and AWS IAM conditions are not
