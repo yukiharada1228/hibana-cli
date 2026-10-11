@@ -87,10 +87,17 @@ async function main() {
   }
   if (command === "login") {
     const api = await apiClient({ ...values, login: true });
-    const name = await api.loginOidc({ noBrowser: values["no-browser"] });
+    const name = await api.loginOidc({ noBrowser: values["no-browser"], roleId: values.role });
     console.log(
       `Connected to ${api.url}\nTenant: ${text(api.tenant)}\nSaved connection: ${text(name)} (used by subsequent commands)`,
     );
+    const session = await api.request("/auth/session");
+    const role = session.role_session
+      ? session.role_session.current_role?.name || "Not selected"
+      : session.role || "Unknown";
+    console.log(`Role: ${text(role)}\nExpires: ${text(session.expires_at)}`);
+    if (session.role_session && !session.role_session.current_role)
+      console.log("Run hibana iam session to see your assigned roles, then hibana iam assume-role --role ID.");
     return;
   }
   if (command === "delete") {

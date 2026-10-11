@@ -18,5 +18,5 @@ export interface ProcessOptions extends SpawnOptions {
   input?: string; stopTimeoutMs?: number; capture?: boolean; maxBuffer?: number; timeout?: number;
 }
 export interface RequestOptions { stream?: boolean; method?: string; body?: any; rawJson?: string; auth?: boolean; signal?: AbortSignal }
-export interface BrowserOptions { noBrowser?: boolean; open?: (url: string) => Promise<void>; timeoutMs?: number; signal?: AbortSignal; log?: (message: string) => void }
+export interface BrowserOptions { noBrowser?: boolean; roleId?: string; switchRole?: boolean; open?: (url: string) => Promise<void>; timeoutMs?: number; signal?: AbortSignal; log?: (message: string) => void }
 export interface RuntimeOptions { fetcher?: typeof fetch; home?: string; target?: string; signal?: AbortSignal; log?: (message: string) => void }

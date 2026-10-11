@@ -305,6 +305,7 @@ const commands: Record<string, Command> = {
       "profile",
       "url",
       "tenant",
+      "role",
       "no-browser"
     ],
     "min": 0,
@@ -312,7 +313,7 @@ const commands: Record<string, Command> = {
     "examples": [
       "hibana login --url https://api.example.com --tenant team"
     ],
-    "notes": "Opens your organization's login page in a browser on this computer.\nUse --no-browser to open the printed URL yourself on the same computer.\nReuses saved connection details; HIBANA_TENANT also supplies the tenant.\nCI: use a scoped HIBANA_TOKEN."
+    "notes": "Opens your organization's login page in a browser on this computer.\nUse --role ID to select an assigned role. Privileged roles require fresh MFA.\nUse --no-browser to open the printed URL yourself on the same computer.\nReuses saved connection details; HIBANA_TENANT also supplies the tenant.\nCI: use hibana iam login with GitHub Actions OIDC."
   },
   "logout": {
     "description": "Remove the saved token for a profile",
@@ -538,7 +539,7 @@ Object.assign(options, {
   duration: { type: "string", value: "SECONDS", description: "Workload session lifetime: 60..3600 (default: 900)" },
   "oidc-token-file": { type: "string", value: "FILE", description: "Read a GitHub OIDC assertion from a file; otherwise request it in GitHub Actions" },
   roles: { type: "string", value: "IDS", description: "Comma-separated role IDs (at most four)" },
-  role: { type: "string", value: "ID", description: "IAM role for the invited member" },
+  role: { type: "string", value: "ID", description: "IAM role ID for a login, role switch or invitation" },
   clear: { type: "boolean", description: "Remove all member role assignments" },
 });
 const iamFlags = ["profile", "url", "json"];
@@ -550,6 +551,10 @@ const iamCrud = (kind: string): Command => ({ description: `Manage IAM ${kind ==
   [kind === "workload" ? "disable" : "delete"]: { description: kind === "workload" ? "Disable a workload and all its sessions" : `Delete a custom ${kind}`, usage: `hibana iam ${kind} ${kind === "workload" ? "disable" : "delete"} ID`, flags: [...iamFlags, "yes"], min: 1, max: 1 },
 }});
 commands.iam = { description: "Manage member and CI access to applications and databases", actions: {
+  session: { description: "Show the current role, expiry and assigned roles", usage: "hibana iam session", flags: iamFlags, min: 0, max: 0 },
+  "assume-role": { description: "Switch the current human session to one assigned role", usage: "hibana iam assume-role --role ID", flags: [...iamFlags, "role", "tenant", "no-browser"], min: 0, max: 0,
+    notes: "Uses browser authentication. Privileged roles require fresh MFA and expire within 15 minutes. The previous session is revoked after a successful switch." },
+  audit: { description: "Inspect identity and CI activity", actions: { list: { description: "List access management audit events", usage: "hibana iam audit list", flags: iamFlags, min: 0, max: 0 } } },
   policy: iamCrud("policy"), role: iamCrud("role"), workload: iamCrud("workload"),
   member: { description: "Manage member roles and invitations", actions: {
     list: { description: "List members and assigned roles", usage: "hibana iam member list", flags: iamFlags, min: 0, max: 0 },

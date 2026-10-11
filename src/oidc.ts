@@ -30,6 +30,8 @@ export async function browserLogin(
   api,
   {
     noBrowser = false,
+    roleId,
+    switchRole = false,
     open = openBrowser,
     timeoutMs = 600_000,
     signal,
@@ -37,6 +39,8 @@ export async function browserLogin(
   }: BrowserOptions = {},
 ) {
   if (!api.tenant) throw new Error("Specify --tenant TEAM (or HIBANA_TENANT)");
+  if ((roleId !== undefined && !/^[A-Za-z0-9_-]{1,128}$/.test(roleId)) || (switchRole && !roleId))
+    throw new Error("Specify a valid role ID");
   const verifier = randomBytes(32).toString("base64url");
   const challenge = createHash("sha256").update(verifier).digest("base64url");
   const state = randomBytes(32).toString("base64url");
@@ -122,15 +126,16 @@ export async function browserLogin(
       server.once("error", reject);
       server.listen(0, "127.0.0.1", resolve);
     });
-    const started = await api.request("/auth/oidc/start", {
+    const started = await api.request(switchRole ? "/auth/role/start" : "/auth/oidc/start", {
       method: "POST",
-      auth: false,
+      auth: switchRole,
       signal: lifetime.signal,
       body: {
         tenant_slug: api.tenant,
         redirect_uri: `http://127.0.0.1:${(server.address() as AddressInfo).port}/oidc/callback`,
         code_challenge: challenge,
         state,
+        ...(roleId ? { role_id: roleId } : {}),
       },
     });
     const authorization = new URL(started.authorization_url);

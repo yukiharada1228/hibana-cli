@@ -55,3 +55,29 @@ test("OIDC CLI refuses unsafe authorization URLs", async () => {
     assert.equal(opened, false);
   }
 });
+
+test("role switching authenticates the start request and keeps the PKCE exchange anonymous", async () => {
+  let started;
+  const api = { tenant: "team", request: async (path, options) => {
+    if (path === "/auth/role/start") {
+      assert.equal(options.auth, true);
+      assert.equal(options.body.role_id, "rol_daily");
+      started = options.body;
+      return { authorization_url: "https://id.example/authorize" };
+    }
+    assert.equal(path, "/auth/oidc/exchange");
+    assert.equal(options.auth, false);
+    assert.equal(createHash("sha256").update(options.body.code_verifier).digest("base64url"), started.code_challenge);
+    return { token: "role-session" };
+  }};
+  const result = await browserLogin(api, { switchRole: true, roleId: "rol_daily", log: () => {}, open: async () => {
+    const callback = new URL(started.redirect_uri);
+    callback.searchParams.set("oidc_code", "d".repeat(64));
+    callback.searchParams.set("oidc_state", started.state);
+    assert.equal((await fetch(callback)).status, 200);
+  }});
+  assert.equal(result.token, "role-session");
+  for (const roleId of [undefined, "", "../roles/other"]) {
+    await assert.rejects(browserLogin({ tenant: "team", request: () => assert.fail("must reject before HTTP") }, { switchRole: true, roleId }), /role ID/);
+  }
+});
