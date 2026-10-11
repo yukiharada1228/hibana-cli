@@ -61,6 +61,12 @@ async function main() {
     if (result !== undefined) console.log(JSON.stringify(result, null, 2));
     return;
   }
+  if (command === "iam") {
+    const { iamCommand } = await import("./iam.js");
+    const result = await interruptible(signal => iamCommand(args, values, signal));
+    if (result !== undefined) console.log(JSON.stringify(result, null, 2));
+    return;
+  }
   if (command === "runtime") {
     const { installRuntime } = await import("./runtime.js");
     return interruptible((signal) => installRuntime(values, { signal }));

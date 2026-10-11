@@ -531,6 +531,35 @@ commands.db.actions!.insights = { description: "Analyze remote query performance
 for (const action of ["query", "migrate"]) commands.db.actions![action].flags!.push("persist-to", "json");
 for (const action of ["list", "create", "delete"]) commands.db.actions![action].flags!.push("json", "config");
 
+Object.assign(options, {
+  account: { type: "string", value: "ID", description: "Hibana account (tenant) ID" },
+  workload: { type: "string", value: "ID", description: "CI workload ID" },
+  audience: { type: "string", value: "VALUE", description: "Exact audience configured for the workload" },
+  duration: { type: "string", value: "SECONDS", description: "Workload session lifetime: 60..3600 (default: 900)" },
+  "oidc-token-file": { type: "string", value: "FILE", description: "Read a GitHub OIDC assertion from a file; otherwise request it in GitHub Actions" },
+  roles: { type: "string", value: "IDS", description: "Comma-separated role IDs (at most four)" },
+  role: { type: "string", value: "ID", description: "IAM role for the invited member" },
+  clear: { type: "boolean", description: "Remove all member role assignments" },
+});
+const iamFlags = ["profile", "url", "json"];
+options.file.description = "SQL file or IAM JSON input";
+const iamCrud = (kind: string): Command => ({ description: `Manage IAM ${kind === "policy" ? "policies" : kind + "s"}`, actions: {
+  list: { description: `List ${kind}s`, usage: `hibana iam ${kind} list`, flags: iamFlags, min: 0, max: 0 },
+  create: { description: `Create a ${kind} from JSON`, usage: `hibana iam ${kind} create --file FILE`, flags: [...iamFlags, "file"], min: 0, max: 0 },
+  update: { description: `Update a ${kind} from JSON`, usage: `hibana iam ${kind} update ID --file FILE`, flags: [...iamFlags, "file", "yes"], min: 1, max: 1 },
+  [kind === "workload" ? "disable" : "delete"]: { description: kind === "workload" ? "Disable a workload and all its sessions" : `Delete a custom ${kind}`, usage: `hibana iam ${kind} ${kind === "workload" ? "disable" : "delete"} ID`, flags: [...iamFlags, "yes"], min: 1, max: 1 },
+}});
+commands.iam = { description: "Manage member and CI access to applications and databases", actions: {
+  policy: iamCrud("policy"), role: iamCrud("role"), workload: iamCrud("workload"),
+  member: { description: "Manage member roles and invitations", actions: {
+    list: { description: "List members and assigned roles", usage: "hibana iam member list", flags: iamFlags, min: 0, max: 0 },
+    "set-roles": { description: "Replace a member's roles", usage: "hibana iam member set-roles USER --roles ROLE[,ROLE...]", flags: [...iamFlags, "roles", "clear", "yes"], min: 1, max: 1 },
+    invite: { description: "Create a single-use invitation with an IAM role", usage: "hibana iam member invite EMAIL --role ROLE", flags: [...iamFlags, "role"], min: 1, max: 1 },
+  }},
+  login: { description: "Exchange GitHub Actions OIDC for a short-lived CI session", usage: "hibana iam login --account ID --workload ID --audience VALUE", flags: ["profile", "url", "account", "workload", "audience", "duration", "oidc-token-file"], min: 0, max: 0,
+    notes: "In GitHub Actions, grant id-token: write. The issuer, audience and subject must match the configured workload. The token is saved in the selected profile and never printed. Default lifetime: 15 minutes; maximum: one hour." },
+}};
+
 function rows(entries: string[][]) {
   const width = Math.max(...entries.map(([label]) => label.length));
   return entries
@@ -552,7 +581,7 @@ Development:
 ${rows(["init", "dev", "build", "deploy"].map((name) => [name, commands[name].description]))}
 
 Applications and connections:
-${rows(["login", "logout", "whoami", "list", "tail", "rollback", "delete", "secret", "db", "egress", "profile"].map((name) => [name, commands[name].description]))}
+${rows(["login", "logout", "whoami", "list", "tail", "rollback", "delete", "secret", "db", "egress", "iam", "profile"].map((name) => [name, commands[name].description]))}
 
 Advanced:
 ${rows(["runtime"].map((name) => [name, commands[name].description]))}

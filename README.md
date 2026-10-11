@@ -304,3 +304,109 @@ return Response.json({ rows: rows.results, bookmark: session.getBookmark() });
 ```
 
 Session bookmarks are opaque Hibana tokens, distinct from Time Travel recovery bookmarks and incompatible with Cloudflare D1 bookmarks. A session stops after a query fails, including an ambiguous response after a write; start a new `first-primary` session and check the outcome before retrying a write. Sessions require the updated remote Hibana service and are not supported by the local SQLite runtime. Local `prepare`, `batch`, `raw` and `exec` remain available.
+
+## Account access (IAM)
+
+Members and CI use roles containing explicit policies. Policies can allow or deny
+operations on individual applications and databases; explicit denies take
+precedence. All permissions stay within the current account. Existing token
+scopes remain an additional ceiling. After a grant exceeds an older token’s
+scopes, sign in again or issue a new token to use it. Revocations and denies
+also apply to existing sessions.
+
+Create a `policy.json` request (replace the account and resource IDs):
+
+```json
+{
+  "name": "Deploy API and read its database",
+  "document": {
+    "Version": "2026-10-11",
+    "Statement": [
+      {
+        "Effect": "Allow",
+        "Action": ["application:Get", "application:Deploy", "application:ReadLogs"],
+        "Resource": ["hibana:ten_ACCOUNT:application/cmp_API"]
+      },
+      {
+        "Effect": "Allow",
+        "Action": ["database:Get", "database:Read"],
+        "Resource": ["hibana:ten_ACCOUNT:database/db_DATA"]
+      }
+    ]
+  }
+}
+```
+
+```sh
+hibana iam policy create --file policy.json
+hibana iam policy list
+# role.json: {"name":"API deployer","description":"Production API","policy_ids":["pol_ID"]}
+hibana iam role create --file role.json
+hibana iam role list
+hibana iam member list
+hibana iam member set-roles usr_MEMBER --roles rol_DEPLOYER
+hibana iam member invite person@example.com --role rol_DEPLOYER
+```
+
+A member can have up to four roles; a role can contain up to four policies.
+`set-roles` replaces the assignment; `--clear` removes all roles. Changes apply
+to existing sessions. The last active human Administrator is protected against
+removal. Policies and roles managed by Hibana cannot be edited or deleted.
+
+Policies use `*`, a service wildcard such as `application:*`, or complete resource
+IDs / account-bound resource wildcards such as
+`hibana:ten_ACCOUNT:database/*`. Partial wildcards and AWS IAM conditions are not
+supported. An application deployer can deploy code using that application's
+already-approved database bindings and secrets. Direct database access and the
+ability to approve bindings are separate permissions.
+
+For GitHub Actions, create a workload with an exact audience and subject:
+
+```json
+{
+  "name": "Production deploy",
+  "role_id": "rol_DEPLOYER",
+  "issuer": "https://token.actions.githubusercontent.com",
+  "audience": "hibana:ten_ACCOUNT",
+  "subject": "REPLACE_WITH_THE_EXACT_GITHUB_OIDC_SUBJECT",
+  "enabled": true
+}
+```
+
+```sh
+hibana iam workload create --file workload.json
+hibana iam workload list
+```
+
+Use GitHub's actual subject format for the repository and selected branch or
+protected environment. Depending on repository settings and creation/transfer
+date, the subject can include immutable IDs; do not assume an owner/name-only
+format. Wildcard subjects are rejected.
+
+```yaml
+permissions:
+  contents: read
+  id-token: write
+steps:
+  # Check out your project and set up Node.js 24+ before these steps.
+  - run: >-
+      npx @yukiharada1228/hibana iam login
+      --url https://console.hibana.cloud/api
+      --account ten_ACCOUNT --workload wrk_ID
+      --audience hibana:ten_ACCOUNT --profile ci
+  - run: npx @yukiharada1228/hibana deploy --profile ci
+```
+
+Replace the URL and IDs with your deployment's values. The CLI requests a GitHub
+OIDC assertion and exchanges it for a Hibana session. The session defaults to
+15 minutes (`--duration 60..3600`), and is saved only in the selected CLI profile.
+The provider assertion is never saved to that profile. Do not set `HIBANA_TOKEN`
+for this flow: it would override the profile. `--oidc-token-file PATH` can supply
+a GitHub assertion from a protected file when required.
+
+`hibana iam workload disable wrk_ID` invalidates its sessions immediately.
+Updating a workload also invalidates existing sessions; re-enabling it does not
+revive old credentials. Policy and role updates change permissions on the next
+request. Use `policy|role|workload update ID --file request.json` to edit settings,
+`policy|role delete ID` to remove custom objects, and `--yes` for noninteractive
+confirmation. Avoid retaining CLI profiles as CI artifacts.

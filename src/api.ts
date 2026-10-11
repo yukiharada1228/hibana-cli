@@ -22,12 +22,16 @@ export async function apiClient(options: CliOptions = {}) {
   let token = savedToken;
   async function request(
     path,
-    { method = "GET", body, auth = true, signal, stream = false }: RequestOptions = {},
+    { method = "GET", body, rawJson, auth = true, signal, stream = false }: RequestOptions = {},
   ) {
     if (auth && !token)
       throw new Error("Run hibana login, or set HIBANA_TOKEN");
     const headers: Record<string, string> = auth ? { Authorization: `Bearer ${token}` } : {};
-    if (body !== undefined && !(body instanceof FormData)) {
+    if (rawJson !== undefined) {
+      if (body !== undefined) throw new Error("Specify either body or rawJson");
+      headers["Content-Type"] = "application/json";
+      body = rawJson;
+    } else if (body !== undefined && !(body instanceof FormData)) {
       headers["Content-Type"] = "application/json";
       body = JSON.stringify(body);
     }
